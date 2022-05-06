@@ -1,11 +1,13 @@
 phony "main" {
   command = "where am i? in ${path.current} ?"
 
-  depends_on = [target.first]
+  depends_on = [first, phony.second]
 }
 
 target "first" {
   command = "how to say ${pid}"
+}
 
-  depends_on = [phony.main]
+phony "second" {
+  command = "the cow says ${path.current}"
 }

@@ -24,42 +24,67 @@ type Task struct {
 	DependsOn []hcl.Traversal
 }
 
-func NewPhony(phony lang.PhonyConfig) (Phony, hcl.Diagnostics) {
-	task := Task{
-		Name:    phony.ID,
-		Command: phony.Command,
-	}
-	diagnostics := make(hcl.Diagnostics, 0)
-	attrs, diags := phony.Remain.JustAttributes()
-	if diags.HasErrors() {
-		diagnostics = append(diagnostics, diags...)
-	}
-
-	for name, attr := range attrs {
-		if name == "depends_on" {
-			task.DependsOn = attr.Expr.Variables()
-		}
-	}
-
-	return Phony{task}, diagnostics
+type Identifiable interface {
+	GetName() string
+	Dependencies() []hcl.Traversal
 }
 
-func NewTarget(target lang.TargetConfig) (Target, hcl.Diagnostics) {
-	task := Task{
-		Name:    target.ID,
-		Command: target.Command,
-	}
-	diagnostics := make(hcl.Diagnostics, 0)
-	attrs, diags := target.Remain.JustAttributes()
+func (task Task) GetName() string {
+	return task.Name
+}
+
+func (task Task) Dependencies() []hcl.Traversal {
+	return task.DependsOn
+}
+
+func NewPhony(phony lang.PhonyConfig) (*Phony, hcl.Diagnostics) {
+	task, diags := newTask(phony.Name, phony.Command, phony.Remain)
 	if diags.HasErrors() {
-		diagnostics = append(diagnostics, diags...)
+		return nil, diags
 	}
 
+	return &Phony{*task}, nil
+}
+
+func NewTarget(target lang.TargetConfig) (*Target, hcl.Diagnostics) {
+	task, diags := newTask(target.Name, target.Command, target.Remain)
+	if diags.HasErrors() {
+		return nil, diags
+	}
+
+	return &Target{*task}, nil
+}
+
+func newTask(name, command string, remain hcl.Body) (*Task, hcl.Diagnostics) {
+	attrs, diags := remain.JustAttributes()
+	if diags.HasErrors() {
+		return nil, diags
+	}
+
+	dependencies, diags := dependsOn(attrs)
+	if diags.HasErrors() {
+		return nil, diags
+	}
+
+	return &Task{
+		Name:      name,
+		Command:   command,
+		DependsOn: dependencies,
+	}, nil
+}
+
+func dependsOn(attrs hcl.Attributes) ([]hcl.Traversal, hcl.Diagnostics) {
+	diagnostics := make(hcl.Diagnostics, 0)
 	for name, attr := range attrs {
 		if name == "depends_on" {
-			task.DependsOn = attr.Expr.Variables()
+			variables, diags := lang.TupleOfReferences(attr)
+			if diags.HasErrors() {
+				diagnostics = diagnostics.Extend(diags)
+				continue
+			}
+			return variables, nil
 		}
 	}
 
-	return Target{task}, diagnostics
+	return nil, diagnostics
 }

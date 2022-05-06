@@ -8,14 +8,13 @@ type Recipe struct {
 }
 
 type PhonyConfig struct {
-	ID      string   `hcl:"id,label"`
+	Name    string   `hcl:"name,label"`
 	Command string   `hcl:"command,optional"`
 	Remain  hcl.Body `hcl:",remain"`
 }
 
 type TargetConfig struct {
-	ID      string   `hcl:"id,label"`
+	Name    string   `hcl:"name,label"`
 	Command string   `hcl:"command,optional"`
 	Remain  hcl.Body `hcl:",remain"`
-	// DependsOn []hcl.Traversal `hcl:"depends_on,optional"`
 }

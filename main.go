@@ -42,10 +42,12 @@ func main() {
 		LogAndExit(logger, diags)
 	}
 
-	logger.WriteDiagnostics(diags)
-	log.Printf("Configuration is %#v", recipe)
+	deps, diags := recipe.Dependencies(recipe.Phonies[0])
+	logger.WriteDiagnostics(diags.Extend(diags))
+	log.Printf("Dependencies are %#v", deps)
 }
 
+// Decode todo: check that the IDs are not duplicated
 func Decode(container lang.Recipe) (*Recipe, hcl.Diagnostics) {
 	diagnostics := make(hcl.Diagnostics, 0)
 	recipe := Recipe{}
@@ -56,7 +58,7 @@ func Decode(container lang.Recipe) (*Recipe, hcl.Diagnostics) {
 			continue
 		}
 
-		recipe.Phonies = append(recipe.Phonies, phony)
+		recipe.Phonies = append(recipe.Phonies, *phony)
 	}
 
 	for _, langTarget := range container.Targets {
@@ -66,7 +68,7 @@ func Decode(container lang.Recipe) (*Recipe, hcl.Diagnostics) {
 			continue
 		}
 
-		recipe.Targets = append(recipe.Targets, target)
+		recipe.Targets = append(recipe.Targets, *target)
 	}
 
 	return &recipe, diagnostics
