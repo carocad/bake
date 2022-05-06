@@ -5,7 +5,7 @@ phony "main" {
 }
 
 target "first" {
-  command = "how to say ${pid}"
+  command = "how to say ${second.command}"
 
   depends_on = [phony.second]
 }

@@ -51,6 +51,7 @@ func EvalContext() (*hcl.EvalContext, hcl.Diagnostics) {
 	}
 
 	return &hcl.EvalContext{
+		// todo: load all tasks here
 		Variables: map[string]cty.Value{
 			"pid": cty.NumberIntVal(int64(os.Getpid())),
 			"path": cty.ObjectVal(map[string]cty.Value{
