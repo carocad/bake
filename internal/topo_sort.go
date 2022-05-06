@@ -21,42 +21,16 @@ type identifiableMark struct {
 
 // Dependencies according to
 // https://www.wikiwand.com/en/Topological_sorting#/Depth-first_search
+// NOTE: the task itself is the last element of the dependency list
 func (recipe Recipe) Dependencies(task Identifiable) ([]Identifiable, hcl.Diagnostics) {
 	markers := make(map[string]*identifiableMark)
-	order := make([]Identifiable, 0)
-	for _, dep := range task.Dependencies() {
-		id, diags := recipe.GetByID(dep)
-		if diags.HasErrors() {
-			return nil, diags
-		}
-
-		markers[id.GetName()] = &identifiableMark{id, unmarked}
-	}
-
-	for keepGoing(markers) {
-		for name, id := range markers {
-			if id.mark == unmarked {
-				inner, diags := recipe.visit(name, markers)
-				if diags.HasErrors() {
-					return nil, diags
-				}
-
-				order = append(order, inner...)
-			}
-		}
+	markers[task.GetName()] = &identifiableMark{task, unmarked}
+	order, diags := recipe.visit(task.GetName(), markers)
+	if diags.HasErrors() {
+		return nil, diags
 	}
 
 	return order, nil
-}
-
-func keepGoing(markers map[string]*identifiableMark) bool {
-	for _, id := range markers {
-		if id.mark != permanent {
-			return true
-		}
-	}
-
-	return false
 }
 
 func (recipe Recipe) visit(current string, markers map[string]*identifiableMark) ([]Identifiable, hcl.Diagnostics) {
@@ -78,6 +52,11 @@ func (recipe Recipe) visit(current string, markers map[string]*identifiableMark)
 		innerID, diags := recipe.GetByID(dep)
 		if diags.HasErrors() {
 			return nil, diags
+		}
+
+		// make sure we initialize the marker
+		if _, found := markers[innerID.GetName()]; !found {
+			markers[innerID.GetName()] = &identifiableMark{innerID, unmarked}
 		}
 
 		inner, diags := recipe.visit(innerID.GetName(), markers)

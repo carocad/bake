@@ -43,7 +43,9 @@ func main() {
 
 	deps, diags := recipe.Dependencies(recipe.Phonies[0])
 	logger.WriteDiagnostics(diags.Extend(diags))
-	log.Printf("Dependencies are %#v", deps)
+	for _, dep := range deps {
+		log.Printf("Dependency: %#v\n\n", dep)
+	}
 }
 
 func LogAndExit(logger hcl.DiagnosticWriter, diags hcl.Diagnostics) {
