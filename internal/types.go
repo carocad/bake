@@ -1,7 +1,7 @@
-package main
+package internal
 
 import (
-	"bake/lang"
+	lang2 "bake/internal/lang"
 	"github.com/hashicorp/hcl/v2"
 )
 
@@ -37,7 +37,7 @@ func (task Task) Dependencies() []hcl.Traversal {
 	return task.DependsOn
 }
 
-func NewPhony(phony lang.PhonyConfig) (*Phony, hcl.Diagnostics) {
+func NewPhony(phony lang2.PhonyConfig) (*Phony, hcl.Diagnostics) {
 	task, diags := newTask(phony.Name, phony.Command, phony.Remain)
 	if diags.HasErrors() {
 		return nil, diags
@@ -46,7 +46,7 @@ func NewPhony(phony lang.PhonyConfig) (*Phony, hcl.Diagnostics) {
 	return &Phony{*task}, nil
 }
 
-func NewTarget(target lang.TargetConfig) (*Target, hcl.Diagnostics) {
+func NewTarget(target lang2.TargetConfig) (*Target, hcl.Diagnostics) {
 	task, diags := newTask(target.Name, target.Command, target.Remain)
 	if diags.HasErrors() {
 		return nil, diags
@@ -77,7 +77,7 @@ func dependsOn(attrs hcl.Attributes) ([]hcl.Traversal, hcl.Diagnostics) {
 	diagnostics := make(hcl.Diagnostics, 0)
 	for name, attr := range attrs {
 		if name == "depends_on" {
-			variables, diags := lang.TupleOfReferences(attr)
+			variables, diags := lang2.TupleOfReferences(attr)
 			if diags.HasErrors() {
 				diagnostics = diagnostics.Extend(diags)
 				continue

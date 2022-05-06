@@ -5,7 +5,8 @@ import (
 	"os"
 	"path/filepath"
 
-	"bake/lang"
+	"bake/internal"
+	"bake/internal/lang"
 	"github.com/hashicorp/hcl/v2"
 	"github.com/hashicorp/hcl/v2/gohcl"
 	"github.com/hashicorp/hcl/v2/hclparse"
@@ -48,11 +49,11 @@ func main() {
 }
 
 // Decode todo: check that the IDs are not duplicated
-func Decode(container lang.Recipe) (*Recipe, hcl.Diagnostics) {
+func Decode(container lang.Recipe) (*internal.Recipe, hcl.Diagnostics) {
 	diagnostics := make(hcl.Diagnostics, 0)
-	recipe := Recipe{}
+	recipe := internal.Recipe{}
 	for _, langPhony := range container.Phonies {
-		phony, diags := NewPhony(langPhony)
+		phony, diags := internal.NewPhony(langPhony)
 		if diags.HasErrors() {
 			diagnostics = append(diagnostics, diags...)
 			continue
@@ -62,7 +63,7 @@ func Decode(container lang.Recipe) (*Recipe, hcl.Diagnostics) {
 	}
 
 	for _, langTarget := range container.Targets {
-		target, diags := NewTarget(langTarget)
+		target, diags := internal.NewTarget(langTarget)
 		if diags.HasErrors() {
 			diagnostics = append(diagnostics, diags...)
 			continue

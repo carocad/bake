@@ -1,4 +1,4 @@
-package main
+package internal
 
 import (
 	"fmt"
@@ -107,7 +107,7 @@ func (recipe Recipe) GetByID(traversal hcl.Traversal) (Identifiable, hcl.Diagnos
 			}}
 		}
 
-		relative := traversal.SimpleSplit().Rel[0]
+		relative := traversal[1]
 		switch tt := relative.(type) {
 		case hcl.TraverseAttr:
 			name := tt.Name
