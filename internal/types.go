@@ -10,6 +10,14 @@ type Recipe struct {
 	Targets []Target
 }
 
+type EventualStatus int
+
+const (
+	Pending EventualStatus = iota
+	Running
+	Completed
+)
+
 type Phony struct {
 	Task
 }
@@ -19,14 +27,24 @@ type Target struct {
 }
 
 type Task struct {
-	Name      string
-	Command   string
-	DependsOn []hcl.Traversal
+	Name        string
+	Command     string
+	Description string
+	// todo: this might be quite big so better clean it up if not used by any other task
+	// todo: make these pointers to allow cty.UnknownValue based on status
+	StdOut   *string
+	StdErr   *string
+	ExitCode *int
+	// internal only
+	dependsOn []hcl.Traversal
+	status    EventualStatus
 }
 
-type Identifiable interface {
+type Action interface {
 	GetName() string
 	Dependencies() []hcl.Traversal
+	Status() EventualStatus
+	// Run() todo: run command and populate status, stdout, stderr and exitcode
 }
 
 func (task Task) GetName() string {
@@ -34,7 +52,11 @@ func (task Task) GetName() string {
 }
 
 func (task Task) Dependencies() []hcl.Traversal {
-	return task.DependsOn
+	return task.dependsOn
+}
+
+func (task Task) Status() EventualStatus {
+	return task.status
 }
 
 func NewPhony(phony lang.PhonyConfig) (*Phony, hcl.Diagnostics) {
@@ -69,7 +91,7 @@ func newTask(name, command string, remain hcl.Body) (*Task, hcl.Diagnostics) {
 	return &Task{
 		Name:      name,
 		Command:   command,
-		DependsOn: dependencies,
+		dependsOn: dependencies,
 	}, nil
 }
 

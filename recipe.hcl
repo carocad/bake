@@ -5,6 +5,18 @@ phony "main" {
 }
 
 target "first" {
+  command = "how to say ${pid}"
+
+  depends_on = [phony.second]
+}
+
+phony "second" {
+  command = "the cow says ${path.current}"
+}
+
+
+/*
+target "first" {
   command = "how to say ${second.command}"
 
   depends_on = [phony.second]
@@ -13,3 +25,4 @@ target "first" {
 phony "second" {
   command = "the cow says ${path.current}"
 }
+*/

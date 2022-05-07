@@ -9,7 +9,7 @@ import (
 	"github.com/zclconf/go-cty/cty"
 )
 
-// Decode todo: check that the IDs are not duplicated
+// Decode todo: check that the task.Names are not duplicated
 func Decode(container lang.Recipe) (*Recipe, hcl.Diagnostics) {
 	diagnostics := make(hcl.Diagnostics, 0)
 	recipe := Recipe{}
@@ -41,13 +41,11 @@ func Decode(container lang.Recipe) (*Recipe, hcl.Diagnostics) {
 func EvalContext() (*hcl.EvalContext, hcl.Diagnostics) {
 	cwd, err := os.Getwd()
 	if err != nil {
-		return nil, hcl.Diagnostics{
-			&hcl.Diagnostic{
-				Severity: hcl.DiagError,
-				Summary:  "couldn't get current working directory",
-				Detail:   "this is an internal 'bake' error. Please contact the chef",
-			},
-		}
+		return nil, hcl.Diagnostics{{
+			Severity: hcl.DiagError,
+			Summary:  "couldn't get current working directory",
+			Detail:   err.Error(),
+		}}
 	}
 
 	return &hcl.EvalContext{

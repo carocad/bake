@@ -46,6 +46,9 @@ func main() {
 	for _, dep := range deps {
 		log.Printf("Dependency: %#v\n\n", dep)
 	}
+
+	val := internal.Value(recipe.Phonies[0])
+	log.Printf("values: %#v", val)
 }
 
 func LogAndExit(logger hcl.DiagnosticWriter, diags hcl.Diagnostics) {

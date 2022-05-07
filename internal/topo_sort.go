@@ -15,14 +15,14 @@ const (
 )
 
 type identifiableMark struct {
-	Identifiable
+	Action
 	mark
 }
 
 // Dependencies according to
 // https://www.wikiwand.com/en/Topological_sorting#/Depth-first_search
 // NOTE: the task itself is the last element of the dependency list
-func (recipe Recipe) Dependencies(task Identifiable) ([]Identifiable, hcl.Diagnostics) {
+func (recipe Recipe) Dependencies(task Action) ([]Action, hcl.Diagnostics) {
 	markers := make(map[string]*identifiableMark)
 	markers[task.GetName()] = &identifiableMark{task, unmarked}
 	order, diags := recipe.visit(task.GetName(), markers)
@@ -33,7 +33,7 @@ func (recipe Recipe) Dependencies(task Identifiable) ([]Identifiable, hcl.Diagno
 	return order, nil
 }
 
-func (recipe Recipe) visit(current string, markers map[string]*identifiableMark) ([]Identifiable, hcl.Diagnostics) {
+func (recipe Recipe) visit(current string, markers map[string]*identifiableMark) ([]Action, hcl.Diagnostics) {
 	id := markers[current]
 	if id.mark == permanent {
 		return nil, nil
@@ -47,7 +47,7 @@ func (recipe Recipe) visit(current string, markers map[string]*identifiableMark)
 	}
 
 	id.mark = temporary
-	order := make([]Identifiable, 0)
+	order := make([]Action, 0)
 	for _, dep := range id.Dependencies() {
 		innerID, diags := recipe.GetByID(dep)
 		if diags.HasErrors() {
@@ -67,13 +67,13 @@ func (recipe Recipe) visit(current string, markers map[string]*identifiableMark)
 		order = append(order, inner...)
 	}
 	id.mark = permanent
-	order = append(order, id.Identifiable)
+	order = append(order, id.Action)
 	return order, nil
 }
 
 const detail = `A reference to a %s type must be followed by at least one attribute access, specifying its name.`
 
-func (recipe Recipe) GetByID(traversal hcl.Traversal) (Identifiable, hcl.Diagnostics) {
+func (recipe Recipe) GetByID(traversal hcl.Traversal) (Action, hcl.Diagnostics) {
 	root := traversal.RootName()
 	switch root {
 	case "phony":
@@ -92,7 +92,7 @@ func (recipe Recipe) GetByID(traversal hcl.Traversal) (Identifiable, hcl.Diagnos
 			name := tt.Name
 			for _, phony := range recipe.Phonies {
 				if phony.Name == name {
-					return Identifiable(phony), nil
+					return Action(phony), nil
 				}
 			}
 		default:
@@ -106,7 +106,7 @@ func (recipe Recipe) GetByID(traversal hcl.Traversal) (Identifiable, hcl.Diagnos
 	default: // target
 		for _, target := range recipe.Targets {
 			if target.Name == root {
-				return Identifiable(target), nil
+				return Action(target), nil
 			}
 		}
 	}
