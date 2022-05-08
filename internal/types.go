@@ -2,6 +2,7 @@ package internal
 
 import (
 	"fmt"
+	"os"
 	"os/exec"
 
 	"bake/internal/lang"
@@ -58,9 +59,17 @@ func (task Task) Status() EventualStatus {
 }
 
 func (task *Task) Run() hcl.Diagnostics {
-	// todo: select shell based on env?
-	// todo: auto inject 'set -euo pipefail'
-	command := exec.Command("bash", "-c", task.Command)
+	terminal := "bash"
+	shell, ok := os.LookupEnv("SHELL")
+	if ok {
+		terminal = shell
+	}
+
+	script := fmt.Sprintf(`
+	set -euo pipefail
+
+	%s`, task.Command)
+	command := exec.Command(terminal, "-c", script)
 	output, err := command.Output()
 	if output != nil {
 		outStr := string(output)
@@ -68,7 +77,6 @@ func (task *Task) Run() hcl.Diagnostics {
 	}
 	// todo: keep a ref to command.ProcessState since it contains useful info
 	// like process time, exit code, etc
-
 	code := command.ProcessState.ExitCode()
 	task.ExitCode = &code
 	if err != nil {
@@ -85,6 +93,7 @@ func (task *Task) Run() hcl.Diagnostics {
 		}}
 	}
 
+	// log.Println(command.String(), *task.ExitCode, *task.StdOut, task.StdErr)
 	return nil
 }
 
