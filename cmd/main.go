@@ -26,7 +26,7 @@ func main() {
 
 	// decode the AST into a Go Struct
 	var langRecipe lang.Recipe
-	evalContext, diags := internal.EvalContext()
+	evalContext, diags := internal.StaticEvalContext()
 	if diags.HasErrors() {
 		LogAndExit(logger, diags)
 	}
@@ -36,7 +36,7 @@ func main() {
 		LogAndExit(logger, diags)
 	}
 
-	recipe, diags := internal.Decode(langRecipe)
+	recipe, diags := internal.NewRecipe(langRecipe)
 	if diags.HasErrors() {
 		LogAndExit(logger, diags)
 	}
@@ -47,8 +47,21 @@ func main() {
 		log.Printf("Dependency: %#v\n\n", dep)
 	}
 
-	val := internal.Value(recipe.Phonies[0])
-	log.Printf("values: %#v", val)
+	for _, phony := range recipe.Phonies {
+		if phony.Name == "main" {
+			deps, diags := recipe.Dependencies(phony)
+			if diags.HasErrors() {
+				LogAndExit(logger, diags)
+			}
+
+			for _, action := range deps {
+				diags := action.Run()
+				if diags.HasErrors() {
+					LogAndExit(logger, diags)
+				}
+			}
+		}
+	}
 }
 
 func LogAndExit(logger hcl.DiagnosticWriter, diags hcl.Diagnostics) {

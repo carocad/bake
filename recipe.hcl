@@ -1,17 +1,17 @@
 phony "main" {
-  command = "where am i? in ${path.current} ?"
+  command = "echo 'I did it :)'"
 
   depends_on = [first]
 }
 
 target "first" {
-  command = "how to say ${pid}"
+  command = "ls -l ."
 
   depends_on = [phony.second]
 }
 
 phony "second" {
-  command = "the cow says ${path.current}"
+  command = "pwd"
 }
 
 

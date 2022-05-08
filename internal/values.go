@@ -9,6 +9,9 @@ import (
 
 // check json.typeFields for inspiration of reflect logic
 
+// Value converts go lang structs into cty maps automatically.
+// By convention nil pointers are represented as cty.UnknownVal
+// and once known the pointer should be set to an appropriate value
 func Value(instance interface{}) map[string]cty.Value {
 	result := map[string]cty.Value{}
 	val := reflect.Indirect(reflect.ValueOf(instance))
@@ -32,17 +35,17 @@ func Value(instance interface{}) map[string]cty.Value {
 				result[name] = cty.UnknownVal(ctyType(ptrType.Kind()))
 			} else {
 				inner := reflect.ValueOf(val.Field(index).Interface())
-				result[name] = nativeValue(ptrType.Kind(), inner.Elem())
+				result[name] = primitive(ptrType.Kind(), inner.Elem())
 			}
 		default:
-			result[name] = nativeValue(field.Type.Kind(), val.Field(index))
+			result[name] = primitive(field.Type.Kind(), val.Field(index))
 		}
 	}
 
 	return result
 }
 
-func nativeValue(kind reflect.Kind, field reflect.Value) cty.Value {
+func primitive(kind reflect.Kind, field reflect.Value) cty.Value {
 	switch kind {
 	case reflect.String:
 		return cty.StringVal(field.String())

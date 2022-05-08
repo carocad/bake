@@ -9,8 +9,13 @@ import (
 	"github.com/zclconf/go-cty/cty"
 )
 
-// Decode todo: check that the task.Names are not duplicated
-func Decode(container lang.Recipe) (*Recipe, hcl.Diagnostics) {
+type Recipe struct {
+	Phonies []Phony
+	Targets []Target
+}
+
+// NewRecipe todo: check that the task.Names are not duplicated
+func NewRecipe(container lang.Recipe) (*Recipe, hcl.Diagnostics) {
 	diagnostics := make(hcl.Diagnostics, 0)
 	recipe := Recipe{}
 	for _, langPhony := range container.Phonies {
@@ -36,9 +41,22 @@ func Decode(container lang.Recipe) (*Recipe, hcl.Diagnostics) {
 	return &recipe, diagnostics
 }
 
-// EvalContext provides an evaluation context so that special variables
+func (recipe Recipe) EvalContext() (*hcl.EvalContext, hcl.Diagnostics) {
+	ctx := map[string]cty.Value{}
+	for _, phony := range recipe.Phonies {
+		ctx[phony.Name] = cty.ObjectVal(Value(phony))
+	}
+
+	for _, target := range recipe.Targets {
+		ctx[target.Name] = cty.ObjectVal(Value(target))
+	}
+
+	return &hcl.EvalContext{Variables: ctx}, nil
+}
+
+// StaticEvalContext provides an evaluation context so that special variables
 // are available to the recipe user
-func EvalContext() (*hcl.EvalContext, hcl.Diagnostics) {
+func StaticEvalContext() (*hcl.EvalContext, hcl.Diagnostics) {
 	cwd, err := os.Getwd()
 	if err != nil {
 		return nil, hcl.Diagnostics{{

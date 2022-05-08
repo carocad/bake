@@ -1,14 +1,13 @@
 package internal
 
 import (
+	"fmt"
+	"log"
+	"os/exec"
+
 	"bake/internal/lang"
 	"github.com/hashicorp/hcl/v2"
 )
-
-type Recipe struct {
-	Phonies []Phony
-	Targets []Target
-}
 
 type EventualStatus int
 
@@ -44,7 +43,7 @@ type Action interface {
 	GetName() string
 	Dependencies() []hcl.Traversal
 	Status() EventualStatus
-	// Run() todo: run command and populate status, stdout, stderr and exitcode
+	Run() hcl.Diagnostics
 }
 
 func (task Task) GetName() string {
@@ -57,6 +56,23 @@ func (task Task) Dependencies() []hcl.Traversal {
 
 func (task Task) Status() EventualStatus {
 	return task.status
+}
+
+func (task Task) Run() hcl.Diagnostics {
+	// todo: select shell based on env?
+	// todo: auto inject 'set -euo pipefail'
+	command := exec.Command("bash", "-c", task.Command)
+	log.Printf("executing %s", command.String())
+	err := command.Run()
+	if err != nil {
+		return hcl.Diagnostics{{
+			Severity: hcl.DiagError,
+			Summary:  fmt.Sprintf("%s failed with %s", task.Command, err.Error()),
+			// todo: stderr
+		}}
+	}
+
+	return nil
 }
 
 func NewPhony(phony lang.PhonyConfig) (*Phony, hcl.Diagnostics) {
