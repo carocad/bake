@@ -33,6 +33,8 @@ func (recipe Recipe) Dependencies(task Action) ([]Action, hcl.Diagnostics) {
 	return order, nil
 }
 
+const cyclicalDependency = "cyclical dependency detected"
+
 func (recipe Recipe) visit(current string, markers map[string]*identifiableMark) ([]Action, hcl.Diagnostics) {
 	id := markers[current]
 	if id.mark == permanent {
@@ -42,7 +44,8 @@ func (recipe Recipe) visit(current string, markers map[string]*identifiableMark)
 	if id.mark == temporary {
 		return nil, hcl.Diagnostics{{
 			Severity: hcl.DiagError,
-			Summary:  "cyclical dependency detected",
+			Summary:  cyclicalDependency,
+			Detail:   current,
 		}}
 	}
 
@@ -61,6 +64,11 @@ func (recipe Recipe) visit(current string, markers map[string]*identifiableMark)
 
 		inner, diags := recipe.visit(innerID.GetName(), markers)
 		if diags.HasErrors() {
+			for _, diag := range diags {
+				if diag.Summary == cyclicalDependency {
+					diag.Detail = fmt.Sprintf("%s -> %s", current, diag.Detail)
+				}
+			}
 			return nil, diags
 		}
 

@@ -7,6 +7,8 @@ type Recipe struct {
 	Targets []TargetConfig `hcl:"target,block"`
 }
 
+// todo: add a fail_on_error attribute to continue even if the command failed
+
 type PhonyConfig struct {
 	Name        string   `hcl:"name,label"`
 	Description string   `hcl:"description,optional"`
