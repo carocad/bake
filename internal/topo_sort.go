@@ -92,7 +92,7 @@ func (recipe Recipe) GetByID(traversal hcl.Traversal) (Action, hcl.Diagnostics) 
 			name := tt.Name
 			for _, phony := range recipe.Phonies {
 				if phony.Name == name {
-					return Action(phony), nil
+					return Action(&phony), nil
 				}
 			}
 		default:
@@ -106,7 +106,7 @@ func (recipe Recipe) GetByID(traversal hcl.Traversal) (Action, hcl.Diagnostics) 
 	default: // target
 		for _, target := range recipe.Targets {
 			if target.Name == root {
-				return Action(target), nil
+				return Action(&target), nil
 			}
 		}
 	}

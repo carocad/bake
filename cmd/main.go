@@ -1,7 +1,6 @@
 package main
 
 import (
-	"log"
 	"os"
 
 	"bake/internal"
@@ -41,15 +40,9 @@ func main() {
 		LogAndExit(logger, diags)
 	}
 
-	deps, diags := recipe.Dependencies(recipe.Phonies[0])
-	logger.WriteDiagnostics(diags.Extend(diags))
-	for _, dep := range deps {
-		log.Printf("Dependency: %#v\n\n", dep)
-	}
-
 	for _, phony := range recipe.Phonies {
 		if phony.Name == "main" {
-			deps, diags := recipe.Dependencies(phony)
+			deps, diags := recipe.Dependencies(&phony)
 			if diags.HasErrors() {
 				LogAndExit(logger, diags)
 			}
