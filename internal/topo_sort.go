@@ -22,10 +22,10 @@ type identifiableMark struct {
 // Dependencies according to
 // https://www.wikiwand.com/en/Topological_sorting#/Depth-first_search
 // NOTE: the task itself is the last element of the dependency list
-func (recipe Recipe) Dependencies(task Action) ([]Action, hcl.Diagnostics) {
+func (state System) Dependencies(task Action) ([]Action, hcl.Diagnostics) {
 	markers := make(map[string]*identifiableMark)
 	markers[task.GetName()] = &identifiableMark{task, unmarked}
-	order, diags := recipe.visit(task.GetName(), markers)
+	order, diags := state.visit(task.GetName(), markers)
 	if diags.HasErrors() {
 		return nil, diags
 	}
@@ -35,7 +35,7 @@ func (recipe Recipe) Dependencies(task Action) ([]Action, hcl.Diagnostics) {
 
 const cyclicalDependency = "cyclical dependency detected"
 
-func (recipe Recipe) visit(current string, markers map[string]*identifiableMark) ([]Action, hcl.Diagnostics) {
+func (state System) visit(current string, markers map[string]*identifiableMark) ([]Action, hcl.Diagnostics) {
 	id := markers[current]
 	if id.mark == permanent {
 		return nil, nil
@@ -52,7 +52,7 @@ func (recipe Recipe) visit(current string, markers map[string]*identifiableMark)
 	id.mark = temporary
 	order := make([]Action, 0)
 	for _, dep := range id.Dependencies() {
-		innerID, diags := recipe.GetByID(dep)
+		innerID, diags := state.GetByID(dep)
 		if diags.HasErrors() {
 			return nil, diags
 		}
@@ -62,7 +62,7 @@ func (recipe Recipe) visit(current string, markers map[string]*identifiableMark)
 			markers[innerID.GetName()] = &identifiableMark{innerID, unmarked}
 		}
 
-		inner, diags := recipe.visit(innerID.GetName(), markers)
+		inner, diags := state.visit(innerID.GetName(), markers)
 		if diags.HasErrors() {
 			for _, diag := range diags {
 				if diag.Summary == cyclicalDependency {
@@ -81,7 +81,7 @@ func (recipe Recipe) visit(current string, markers map[string]*identifiableMark)
 
 const detail = `A reference to a %s type must be followed by at least one attribute access, specifying its name.`
 
-func (recipe Recipe) GetByID(traversal hcl.Traversal) (Action, hcl.Diagnostics) {
+func (state System) GetByID(traversal hcl.Traversal) (Action, hcl.Diagnostics) {
 	root := traversal.RootName()
 	switch root {
 	case "phony":
@@ -98,9 +98,9 @@ func (recipe Recipe) GetByID(traversal hcl.Traversal) (Action, hcl.Diagnostics) 
 		switch tt := relative.(type) {
 		case hcl.TraverseAttr:
 			name := tt.Name
-			for _, phony := range recipe.Phonies {
+			for _, phony := range state.ast.Phonies {
 				if phony.Name == name {
-					return Action(&phony), nil
+					return Action(phony), nil
 				}
 			}
 		default:
@@ -112,9 +112,9 @@ func (recipe Recipe) GetByID(traversal hcl.Traversal) (Action, hcl.Diagnostics) 
 			}}
 		}
 	default: // target
-		for _, target := range recipe.Targets {
+		for _, target := range state.ast.Targets {
 			if target.Name == root {
-				return Action(&target), nil
+				return Action(target), nil
 			}
 		}
 	}
