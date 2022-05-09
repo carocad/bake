@@ -7,6 +7,7 @@ import (
 
 	"bake/internal/lang"
 	"github.com/hashicorp/hcl/v2"
+	"github.com/zclconf/go-cty/cty"
 )
 
 type EventualStatus int
@@ -15,6 +16,13 @@ const (
 	Pending EventualStatus = iota
 	Running
 	Completed
+)
+
+// TargetScope is not necessary since those are "attached" directly to the "module"
+const (
+	PhonyScope  = "phony"
+	LocalScope  = "local"
+	ModuleScope = "module"
 )
 
 type Phony struct {
@@ -40,10 +48,23 @@ type Task struct {
 }
 
 type Action interface {
-	GetName() string
+	GetName() string // todo: do I need a "special" getname method?
 	Dependencies() []hcl.Traversal
 	Status() EventualStatus
 	Run() hcl.Diagnostics
+	Addressable
+}
+
+type Addressable interface {
+	Path() cty.Path
+}
+
+func (target Target) Path() cty.Path {
+	return cty.GetAttrPath(target.Name)
+}
+
+func (phony Phony) Path() cty.Path {
+	return cty.GetAttrPath(PhonyScope).GetAttr(phony.Name)
 }
 
 func (task Task) GetName() string {
@@ -59,6 +80,9 @@ func (task Task) Status() EventualStatus {
 }
 
 func (task *Task) Run() hcl.Diagnostics {
+	task.status = Running
+	defer func() { task.status = Completed }()
+
 	terminal := "bash"
 	shell, ok := os.LookupEnv("SHELL")
 	if ok {

@@ -13,13 +13,8 @@ import (
 	"github.com/zclconf/go-cty/cty"
 )
 
-type AST struct {
-	Phonies []*Phony
-	Targets []*Target
-}
-
 type System struct {
-	ast    *AST
+	root   *Module // the root module
 	parser *hclparse.Parser
 	cwd    string
 	Logger hcl.DiagnosticWriter
@@ -41,7 +36,7 @@ func NewSystem() (*System, hcl.Diagnostics) {
 	}
 
 	return &System{
-		ast:    &AST{},
+		root:   &Module{},
 		parser: parser,
 		Logger: logger,
 		cwd:    cwd,
@@ -69,9 +64,9 @@ func (state System) readRecipes() hcl.Diagnostics {
 			return diags
 		}
 
-		// decode the AST into a Go Struct
+		// decode the Module into a Go Struct
 		var recipe lang.Recipe
-		evalContext, diags := StaticEvalContext() // todo: static? really?
+		evalContext, diags := state.EvalContext(filename.Name())
 		if diags.HasErrors() {
 			return diags
 		}
@@ -88,7 +83,7 @@ func (state System) readRecipes() hcl.Diagnostics {
 				return diags
 			}
 
-			state.ast.Phonies = append(state.ast.Phonies, phony)
+			state.root.Actions = append(state.root.Actions, phony)
 		}
 
 		for _, langTarget := range recipe.Targets {
@@ -97,22 +92,23 @@ func (state System) readRecipes() hcl.Diagnostics {
 				return diags
 			}
 
-			state.ast.Targets = append(state.ast.Targets, target)
+			state.root.Actions = append(state.root.Actions, target)
 		}
 	}
 
 	return nil
 }
 
-func (state System) Plan(action string) ([]Action, hcl.Diagnostics) {
+func (state System) Plan(target string) ([]Action, hcl.Diagnostics) {
 	diags := state.readRecipes()
 	if diags.HasErrors() {
 		return nil, diags
 	}
 
-	for _, phony := range state.ast.Phonies {
-		if phony.Name == action {
-			deps, diags := state.Dependencies(phony)
+	// todo: add missing targets here
+	for _, action := range state.root.Actions {
+		if action.GetName() == target {
+			deps, diags := state.root.Dependencies(action)
 			if diags.HasErrors() {
 				return nil, diags
 			}
@@ -123,7 +119,7 @@ func (state System) Plan(action string) ([]Action, hcl.Diagnostics) {
 
 	return nil, hcl.Diagnostics{{
 		Severity: hcl.DiagError,
-		Summary:  "couldn't find any target with name " + action,
+		Summary:  "couldn't find any target with name " + target,
 	}}
 }
 
@@ -145,41 +141,22 @@ func (state System) Apply(action string) hcl.Diagnostics {
 	return nil
 }
 
-func (state System) EvalContext() (*hcl.EvalContext, hcl.Diagnostics) {
-	ctx := map[string]cty.Value{}
-	for _, phony := range state.ast.Phonies {
-		ctx[phony.Name] = cty.ObjectVal(Value(phony))
+func (state System) EvalContext(filename string) (*hcl.EvalContext, hcl.Diagnostics) {
+	ctx := map[string]cty.Value{
+		"pid": cty.NumberIntVal(int64(os.Getpid())),
+		"path": cty.ObjectVal(map[string]cty.Value{
+			"root":    cty.StringVal(state.cwd),
+			"module":  cty.StringVal(filepath.Join(state.cwd, filepath.Dir(filename))),
+			"current": cty.StringVal(filepath.Join(state.cwd, filename)),
+		}),
 	}
 
-	for _, target := range state.ast.Targets {
-		ctx[target.Name] = cty.ObjectVal(Value(target))
-	}
-
-	return &hcl.EvalContext{Variables: ctx}, nil
-}
-
-// StaticEvalContext provides an evaluation context so that special variables
-// are available to the recipe user
-func StaticEvalContext() (*hcl.EvalContext, hcl.Diagnostics) {
-	cwd, err := os.Getwd()
-	if err != nil {
-		return nil, hcl.Diagnostics{{
-			Severity: hcl.DiagError,
-			Summary:  "couldn't get current working directory",
-			Detail:   err.Error(),
-		}}
+	for _, action := range state.root.Actions {
+		ctx[action.GetName()] = cty.ObjectVal(Value(action))
 	}
 
 	return &hcl.EvalContext{
-		// todo: load all tasks here
-		Variables: map[string]cty.Value{
-			"pid": cty.NumberIntVal(int64(os.Getpid())),
-			"path": cty.ObjectVal(map[string]cty.Value{
-				"root":    cty.StringVal(cwd),
-				"module":  cty.StringVal(filepath.Join(cwd, "TODO")),
-				"current": cty.StringVal(cwd),
-			}),
-		},
+		Variables: ctx,
 		Functions: lang.Functions(),
 	}, nil
 }

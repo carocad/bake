@@ -7,8 +7,6 @@ import (
 	"github.com/hashicorp/hcl/v2"
 )
 
-const recipeFile = "recipe.hcl"
-
 func main() {
 	state, diags := internal.NewSystem()
 	if diags.HasErrors() {
