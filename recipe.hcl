@@ -5,7 +5,8 @@ phony "main" {
 }
 
 target "first" {
-  command = "ls -l ."
+  filename = "cmd/main.bin"
+  command = "go build -o cmd/main.bin cmd/main.go"
 
   depends_on = [phony.second]
 }

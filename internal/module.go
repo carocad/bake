@@ -125,3 +125,10 @@ func ToPath(traversal hcl.Traversal) cty.Path {
 
 	return path
 }
+
+// TargetScope is not necessary since those are "attached" directly to the "module"
+const (
+	PhonyScope  = "phony"
+	LocalScope  = "local"
+	ModuleScope = "module"
+)

@@ -18,21 +18,6 @@ const (
 	Completed
 )
 
-// TargetScope is not necessary since those are "attached" directly to the "module"
-const (
-	PhonyScope  = "phony"
-	LocalScope  = "local"
-	ModuleScope = "module"
-)
-
-type Phony struct {
-	Task
-}
-
-type Target struct {
-	Task
-}
-
 type Task struct {
 	Name        string
 	Command     string
@@ -47,6 +32,30 @@ type Task struct {
 	status    EventualStatus
 }
 
+func NewTask(name string, attrs hcl.Attributes, ctx *hcl.EvalContext) (*Task, hcl.Diagnostics) {
+	command, diagnostics := lang.String(lang.CommandAttr, attrs, ctx)
+	if diagnostics.HasErrors() {
+		return nil, diagnostics
+	}
+
+	description, diagnostics := lang.String(lang.DescriptionAttr, attrs, ctx)
+	if diagnostics.HasErrors() {
+		return nil, diagnostics
+	}
+
+	deps, diagnostics := dependsOn(attrs)
+	if diagnostics.HasErrors() {
+		return nil, diagnostics
+	}
+
+	return &Task{
+		Name:        name,
+		Command:     command,
+		Description: description,
+		dependsOn:   deps,
+	}, nil
+}
+
 type Action interface {
 	GetName() string // todo: do I need a "special" getname method?
 	Dependencies() []hcl.Traversal
@@ -57,14 +66,6 @@ type Action interface {
 
 type Addressable interface {
 	Path() cty.Path
-}
-
-func (target Target) Path() cty.Path {
-	return cty.GetAttrPath(target.Name)
-}
-
-func (phony Phony) Path() cty.Path {
-	return cty.GetAttrPath(PhonyScope).GetAttr(phony.Name)
 }
 
 func (task Task) GetName() string {
@@ -119,42 +120,6 @@ func (task *Task) Run() hcl.Diagnostics {
 
 	// log.Println(command.String(), *task.ExitCode, *task.StdOut, task.StdErr)
 	return nil
-}
-
-func NewPhony(phony lang.PhonyConfig) (*Phony, hcl.Diagnostics) {
-	task, diags := newTask(phony.Name, phony.Command, phony.Remain)
-	if diags.HasErrors() {
-		return nil, diags
-	}
-
-	return &Phony{*task}, nil
-}
-
-func NewTarget(target lang.TargetConfig) (*Target, hcl.Diagnostics) {
-	task, diags := newTask(target.Name, target.Command, target.Remain)
-	if diags.HasErrors() {
-		return nil, diags
-	}
-
-	return &Target{*task}, nil
-}
-
-func newTask(name, command string, remain hcl.Body) (*Task, hcl.Diagnostics) {
-	attrs, diags := remain.JustAttributes()
-	if diags.HasErrors() {
-		return nil, diags
-	}
-
-	dependencies, diags := dependsOn(attrs)
-	if diags.HasErrors() {
-		return nil, diags
-	}
-
-	return &Task{
-		Name:      name,
-		Command:   command,
-		dependsOn: dependencies,
-	}, nil
 }
 
 func dependsOn(attrs hcl.Attributes) ([]hcl.Traversal, hcl.Diagnostics) {

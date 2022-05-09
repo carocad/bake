@@ -8,7 +8,6 @@ import (
 
 	"bake/internal/lang"
 	"github.com/hashicorp/hcl/v2"
-	"github.com/hashicorp/hcl/v2/gohcl"
 	"github.com/hashicorp/hcl/v2/hclparse"
 	"github.com/zclconf/go-cty/cty"
 )
@@ -64,35 +63,35 @@ func (state System) readRecipes() hcl.Diagnostics {
 			return diags
 		}
 
-		// decode the Module into a Go Struct
-		var recipe lang.Recipe
-		evalContext, diags := state.EvalContext(filename.Name())
+		content, diags := f.Body.Content(lang.RecipeSchema())
 		if diags.HasErrors() {
 			return diags
 		}
 
-		diags = gohcl.DecodeBody(f.Body, evalContext, &recipe)
+		context, diags := state.EvalContext(filename.Name())
 		if diags.HasErrors() {
 			return diags
 		}
 
-		// todo: move to its own method?
-		for _, langPhony := range recipe.Phonies {
-			phony, diags := NewPhony(langPhony)
+		for _, block := range content.Blocks {
+			switch block.Type {
+			case lang.PhonyLabel:
+				phony, diags := NewPhony(block, context)
+				if diags.HasErrors() {
+					return diags
+				}
+				state.root.Actions = append(state.root.Actions, phony)
+			case lang.TargetLabel:
+				target, diags := NewTarget(block, context)
+				if diags.HasErrors() {
+					return diags
+				}
+				state.root.Actions = append(state.root.Actions, target)
+			}
+
 			if diags.HasErrors() {
 				return diags
 			}
-
-			state.root.Actions = append(state.root.Actions, phony)
-		}
-
-		for _, langTarget := range recipe.Targets {
-			target, diags := NewTarget(langTarget)
-			if diags.HasErrors() {
-				return diags
-			}
-
-			state.root.Actions = append(state.root.Actions, target)
 		}
 	}
 
