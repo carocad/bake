@@ -6,10 +6,8 @@ import (
 	"os"
 	"path/filepath"
 
-	"bake/internal/lang"
 	"github.com/hashicorp/hcl/v2"
 	"github.com/hashicorp/hcl/v2/hclparse"
-	"github.com/zclconf/go-cty/cty"
 )
 
 type System struct {
@@ -35,7 +33,7 @@ func NewSystem() (*System, hcl.Diagnostics) {
 	}
 
 	return &System{
-		root:   &Module{},
+		root:   NewRootModule(cwd),
 		parser: parser,
 		Logger: logger,
 		cwd:    cwd,
@@ -63,35 +61,9 @@ func (state System) readRecipes() hcl.Diagnostics {
 			return diags
 		}
 
-		content, diags := f.Body.Content(lang.RecipeSchema())
+		diags = state.root.GetContent(f, filename.Name())
 		if diags.HasErrors() {
 			return diags
-		}
-
-		context, diags := state.EvalContext(filename.Name())
-		if diags.HasErrors() {
-			return diags
-		}
-
-		for _, block := range content.Blocks {
-			switch block.Type {
-			case lang.PhonyLabel:
-				phony, diags := NewPhony(block, context)
-				if diags.HasErrors() {
-					return diags
-				}
-				state.root.Actions = append(state.root.Actions, phony)
-			case lang.TargetLabel:
-				target, diags := NewTarget(block, context)
-				if diags.HasErrors() {
-					return diags
-				}
-				state.root.Actions = append(state.root.Actions, target)
-			}
-
-			if diags.HasErrors() {
-				return diags
-			}
 		}
 	}
 
@@ -138,24 +110,4 @@ func (state System) Apply(action string) hcl.Diagnostics {
 	}
 
 	return nil
-}
-
-func (state System) EvalContext(filename string) (*hcl.EvalContext, hcl.Diagnostics) {
-	ctx := map[string]cty.Value{
-		"pid": cty.NumberIntVal(int64(os.Getpid())),
-		"path": cty.ObjectVal(map[string]cty.Value{
-			"root":    cty.StringVal(state.cwd),
-			"module":  cty.StringVal(filepath.Join(state.cwd, filepath.Dir(filename))),
-			"current": cty.StringVal(filepath.Join(state.cwd, filename)),
-		}),
-	}
-
-	for _, action := range state.root.Actions {
-		ctx[action.GetName()] = cty.ObjectVal(Value(action))
-	}
-
-	return &hcl.EvalContext{
-		Variables: ctx,
-		Functions: lang.Functions(),
-	}, nil
 }

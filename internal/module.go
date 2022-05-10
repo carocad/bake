@@ -2,14 +2,27 @@ package internal
 
 import (
 	"fmt"
+	"path/filepath"
 
+	"bake/internal/lang"
 	"github.com/hashicorp/hcl/v2"
 	"github.com/zclconf/go-cty/cty"
 )
 
 type Module struct {
 	Actions []Action
-	name    string
+	// name by which the module is known; by convention the root module
+	// doesn't have a name as it is "global"
+	name string
+	cwd  string
+}
+
+func NewRootModule(cwd string) *Module {
+	return NewModule("", cwd)
+}
+
+func NewModule(name, cwd string) *Module {
+	return &Module{name: name, cwd: cwd, Actions: make([]Action, 0)}
 }
 
 func (module Module) Path() cty.Path {
@@ -19,6 +32,60 @@ func (module Module) Path() cty.Path {
 	}
 
 	return cty.GetAttrPath("module").GetAttr(module.name)
+}
+
+func (module *Module) GetContent(file *hcl.File, filename string) hcl.Diagnostics {
+	content, diags := file.Body.Content(lang.RecipeSchema())
+	if diags.HasErrors() {
+		return diags
+	}
+
+	context, diags := module.EvalContext(filename)
+	if diags.HasErrors() {
+		return diags
+	}
+
+	for _, block := range content.Blocks {
+		switch block.Type {
+		case lang.PhonyLabel:
+			phony, diags := NewPhony(block, context)
+			if diags.HasErrors() {
+				return diags
+			}
+			module.Actions = append(module.Actions, phony)
+		case lang.TargetLabel:
+			target, diags := NewTarget(block, context)
+			if diags.HasErrors() {
+				return diags
+			}
+			module.Actions = append(module.Actions, target)
+		}
+
+		if diags.HasErrors() {
+			return diags
+		}
+	}
+
+	return nil
+}
+
+func (module Module) EvalContext(filename string) (*hcl.EvalContext, hcl.Diagnostics) {
+	ctx := map[string]cty.Value{
+		"path": cty.ObjectVal(map[string]cty.Value{
+			"root":    cty.StringVal(module.cwd),
+			"module":  cty.StringVal(filepath.Join(module.cwd, filepath.Dir(filename))),
+			"current": cty.StringVal(filepath.Join(module.cwd, filename)),
+		}),
+	}
+
+	for _, action := range module.Actions {
+		ctx[action.GetName()] = cty.ObjectVal(Value(action))
+	}
+
+	return &hcl.EvalContext{
+		Variables: ctx,
+		Functions: lang.Functions(),
+	}, nil
 }
 
 type mark int
