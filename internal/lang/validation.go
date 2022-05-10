@@ -71,7 +71,7 @@ func ListOfStrings(name string, attributes hcl.Attributes, ctx *hcl.EvalContext)
 		return nil, diagnostics
 	}
 
-	if value.Type() != cty.List(cty.String) {
+	if !value.CanIterateElements() {
 		return nil, hcl.Diagnostics{{
 			Severity: hcl.DiagError,
 			Summary:  fmt.Sprintf("'%s' must be a list of strings", name),
@@ -80,7 +80,9 @@ func ListOfStrings(name string, attributes hcl.Attributes, ctx *hcl.EvalContext)
 	}
 
 	result := make([]string, 0)
-	for _, element := range value.AsValueSlice() {
+	it := value.ElementIterator()
+	for it.Next() {
+		_, element := it.Element()
 		if element.IsNull() {
 			return nil, hcl.Diagnostics{{
 				Severity: hcl.DiagError,

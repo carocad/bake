@@ -43,7 +43,7 @@ func TargetSchema() *hcl.BodySchema {
 		Required: true,
 	}, {
 		Name:     SourcesAttr,
-		Required: false,
+		Required: true,
 	}, {
 		Name:     DependsOnAttr,
 		Required: false,
