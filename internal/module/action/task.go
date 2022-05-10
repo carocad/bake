@@ -1,41 +1,17 @@
-package internal
+package action
 
 import (
 	"fmt"
+	"log"
 	"os"
 	"os/exec"
 
 	"bake/internal/lang"
-	"bake/internal/lang/values"
+	"bake/internal/values"
 	"github.com/hashicorp/hcl/v2"
 	"github.com/hashicorp/hcl/v2/gohcl"
 	"github.com/zclconf/go-cty/cty"
 )
-
-type EventualStatus int
-
-const (
-	Pending EventualStatus = iota
-	Running
-	Completed
-)
-
-type Action interface {
-	GetName() string
-	Dependencies() []hcl.Traversal
-	Status() EventualStatus
-	Run() hcl.Diagnostics
-
-	// Settle forces evaluation of expressions that depend on other
-	// actions
-	// Settle() hcl.Diagnostics
-
-	Addressable
-}
-
-type Addressable interface {
-	Path() cty.Path
-}
 
 type Task struct {
 	Name        string
@@ -99,6 +75,8 @@ func (task *Task) Run() hcl.Diagnostics {
 	task.status = Running
 	defer func() { task.status = Completed }()
 
+	log.Println("executing " + task.Name)
+
 	terminal := "bash"
 	shell, ok := os.LookupEnv("SHELL")
 	if ok {
@@ -135,20 +113,4 @@ func (task *Task) Run() hcl.Diagnostics {
 
 	// log.Println(command.String(), *task.ExitCode, *task.StdOut, task.StdErr)
 	return nil
-}
-
-func dependsOn(attrs hcl.Attributes) ([]hcl.Traversal, hcl.Diagnostics) {
-	diagnostics := make(hcl.Diagnostics, 0)
-	for name, attr := range attrs {
-		if name == "depends_on" {
-			variables, diags := lang.TupleOfReferences(attr)
-			if diags.HasErrors() {
-				diagnostics = diagnostics.Extend(diags)
-				continue
-			}
-			return variables, nil
-		}
-	}
-
-	return nil, diagnostics
 }

@@ -21,8 +21,11 @@ phony "third" {
   command = "echo 'world'"
 }
 
+phony "data" {
+  command = "git rev-parse --short HEAD"
+}
+
 // todo: enable for_each
-// todo: enable phony.data as convention for getting information
 /*
 phony "data" {
   for_each = {

@@ -2,16 +2,17 @@ package internal
 
 import (
 	"io/ioutil"
-	"log"
 	"os"
 	"path/filepath"
 
+	module2 "bake/internal/module"
+	"bake/internal/module/action"
 	"github.com/hashicorp/hcl/v2"
 	"github.com/hashicorp/hcl/v2/hclparse"
 )
 
 type System struct {
-	root   *Module // the root module
+	root   *module2.Module // the root module
 	parser *hclparse.Parser
 	cwd    string
 	Logger hcl.DiagnosticWriter
@@ -33,7 +34,7 @@ func NewSystem() (*System, hcl.Diagnostics) {
 	}
 
 	return &System{
-		root:   NewRootModule(cwd),
+		root:   module2.NewRootModule(cwd),
 		parser: parser,
 		Logger: logger,
 		cwd:    cwd,
@@ -70,16 +71,20 @@ func (state System) readRecipes() hcl.Diagnostics {
 	return nil
 }
 
-func (state System) Plan(target string) ([]Action, hcl.Diagnostics) {
+func (state System) Plan(target string) ([]action.Action, hcl.Diagnostics) {
 	diags := state.readRecipes()
 	if diags.HasErrors() {
 		return nil, diags
 	}
 
-	// todo: add missing targets here
-	for _, action := range state.root.Actions {
-		if action.GetName() == target {
-			deps, diags := state.root.Dependencies(action)
+	diags = state.root.Preload()
+	if diags.HasErrors() {
+		return nil, diags
+	}
+
+	for _, act := range state.root.Actions {
+		if act.GetName() == target {
+			deps, diags := state.root.Dependencies(act)
 			if diags.HasErrors() {
 				return nil, diags
 			}
@@ -101,9 +106,8 @@ func (state System) Apply(action string) hcl.Diagnostics {
 	}
 
 	// todo: defer state saving
-	for _, action := range actions {
-		log.Println("executing " + action.GetName())
-		diags = action.Run()
+	for _, act := range actions {
+		diags = act.Run()
 		if diags.HasErrors() {
 			return diags
 		}
