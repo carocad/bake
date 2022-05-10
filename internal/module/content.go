@@ -10,29 +10,13 @@ import (
 	"github.com/zclconf/go-cty/cty"
 )
 
-const dataName = "data"
-
-func (module Module) Preload() hcl.Diagnostics {
-	phonyData := cty.GetAttrPath(lang.PhonyLabel).GetAttr(dataName)
-	for _, act := range module.Actions {
-		if act.Path().Equals(phonyData) {
-			diags := act.Run()
-			if diags.HasErrors() {
-				return diags
-			}
-		}
-	}
-
-	return nil
-}
-
 func (module *Module) GetContent(file *hcl.File, filename string) hcl.Diagnostics {
 	content, diags := file.Body.Content(lang.RecipeSchema())
 	if diags.HasErrors() {
 		return diags
 	}
 
-	context, diags := module.EvalContext(filename)
+	context, diags := module.evalContext(filename)
 	if diags.HasErrors() {
 		return diags
 	}
@@ -44,19 +28,19 @@ func (module *Module) GetContent(file *hcl.File, filename string) hcl.Diagnostic
 			if diags.HasErrors() {
 				return diags
 			}
-			module.Actions = append(module.Actions, act)
+			module.actions = append(module.actions, act)
 		case lang.TargetLabel:
 			act, diags := action.NewTarget(block, context)
 			if diags.HasErrors() {
 				return diags
 			}
-			module.Actions = append(module.Actions, act)
+			module.actions = append(module.actions, act)
 		}
 	}
 
 	// todo: loop over all actions again and "settle" the unknown vars
 	/*
-		context, diags = module.EvalContext(filename)
+		context, diags = module.evalContext(filename)
 		if diags.HasErrors() {
 			return diags
 		}
@@ -64,7 +48,7 @@ func (module *Module) GetContent(file *hcl.File, filename string) hcl.Diagnostic
 	return nil
 }
 
-func (module Module) EvalContext(filename string) (*hcl.EvalContext, hcl.Diagnostics) {
+func (module Module) evalContext(filename string) (*hcl.EvalContext, hcl.Diagnostics) {
 	ctx := map[string]cty.Value{
 		"path": cty.ObjectVal(map[string]cty.Value{
 			"root":    cty.StringVal(module.cwd),
@@ -75,7 +59,7 @@ func (module Module) EvalContext(filename string) (*hcl.EvalContext, hcl.Diagnos
 
 	phonyPrefix := cty.GetAttrPath(lang.PhonyLabel)
 	phony := map[string]cty.Value{}
-	for _, act := range module.Actions {
+	for _, act := range module.actions {
 		name := act.GetName()
 		path := act.Path()
 		if path.HasPrefix(phonyPrefix) {

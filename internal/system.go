@@ -77,26 +77,12 @@ func (state System) Plan(target string) ([]action.Action, hcl.Diagnostics) {
 		return nil, diags
 	}
 
-	diags = state.root.Preload()
+	actions, diags := state.root.Plan(target)
 	if diags.HasErrors() {
 		return nil, diags
 	}
 
-	for _, act := range state.root.Actions {
-		if act.GetName() == target {
-			deps, diags := state.root.Dependencies(act)
-			if diags.HasErrors() {
-				return nil, diags
-			}
-
-			return deps, nil
-		}
-	}
-
-	return nil, hcl.Diagnostics{{
-		Severity: hcl.DiagError,
-		Summary:  "couldn't find any target with name " + target,
-	}}
+	return actions, nil
 }
 
 func (state System) Apply(action string) hcl.Diagnostics {
@@ -105,7 +91,6 @@ func (state System) Apply(action string) hcl.Diagnostics {
 		return diags
 	}
 
-	// todo: defer state saving
 	for _, act := range actions {
 		diags = act.Run()
 		if diags.HasErrors() {

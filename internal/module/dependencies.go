@@ -21,10 +21,10 @@ type actionMark struct {
 	mark
 }
 
-// Dependencies according to
+// dependencies according to
 // https://www.wikiwand.com/en/Topological_sorting#/Depth-first_search
 // NOTE: the task itself is the last element of the dependency list
-func (module Module) Dependencies(task action.Action) ([]action.Action, hcl.Diagnostics) {
+func (module Module) dependencies(task action.Action) ([]action.Action, hcl.Diagnostics) {
 	markers := make(map[string]*actionMark)
 	path := lang.PathString(task.Path())
 	markers[path] = &actionMark{task, unmarked}
@@ -55,7 +55,7 @@ func (module Module) visit(current string, markers map[string]*actionMark) ([]ac
 	id.mark = temporary
 	order := make([]action.Action, 0)
 	for _, dep := range id.Dependencies() {
-		innerID, diags := module.GetByID(dep)
+		innerID, diags := module.getByID(dep)
 		if diags.HasErrors() {
 			return nil, diags
 		}
@@ -83,9 +83,9 @@ func (module Module) visit(current string, markers map[string]*actionMark) ([]ac
 	return order, nil
 }
 
-func (module Module) GetByID(traversal hcl.Traversal) (action.Action, hcl.Diagnostics) {
+func (module Module) getByID(traversal hcl.Traversal) (action.Action, hcl.Diagnostics) {
 	path := lang.ToPath(traversal)
-	for _, act := range module.Actions {
+	for _, act := range module.actions {
 		if act.Path().Equals(path) {
 			return act, nil
 		}

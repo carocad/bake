@@ -6,7 +6,7 @@ import (
 )
 
 type Module struct {
-	Actions []action.Action
+	actions []action.Action
 	// name by which the module is known; by convention the root module
 	// doesn't have a name as it is "global"
 	name string
@@ -18,7 +18,7 @@ func NewRootModule(cwd string) *Module {
 }
 
 func NewModule(name, cwd string) *Module {
-	return &Module{name: name, cwd: cwd, Actions: make([]action.Action, 0)}
+	return &Module{name: name, cwd: cwd, actions: make([]action.Action, 0)}
 }
 
 func (module Module) Path() cty.Path {
