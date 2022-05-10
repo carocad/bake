@@ -6,7 +6,7 @@ phony "main" {
 
 target "first" {
   filename = "cmd/main.bin"
-  command  = "go build -o cmd/${phony.data.command}.bin cmd/main.go"
+  command  = "go build -o cmd/${phony.data.std_out}.bin cmd/main.go"
   sources  = ["cmd/main.go"]
 
   depends_on = [phony.second]

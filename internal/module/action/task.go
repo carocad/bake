@@ -5,6 +5,7 @@ import (
 	"log"
 	"os"
 	"os/exec"
+	"strings"
 
 	"bake/internal/lang"
 	"bake/internal/values"
@@ -19,9 +20,9 @@ type Task struct {
 	Description string
 	// todo: this might be quite big so better clean it up if not used by any other task
 	// todo: make these pointers to allow cty.UnknownValue based on status
-	StdOut   *string
-	StdErr   *string
-	ExitCode *int
+	StdOut   values.EventualString
+	StdErr   values.EventualString
+	ExitCode values.EventualInt64
 	// internal only
 	dependsOn []hcl.Traversal
 }
@@ -85,6 +86,9 @@ func (task *Task) Preload(ctx *hcl.EvalContext) hcl.Diagnostics {
 }
 
 func (task *Task) Run() hcl.Diagnostics {
+	if task.ExitCode.Valid {
+
+	}
 	log.Println("executing " + task.Name)
 
 	terminal := "bash"
@@ -99,22 +103,25 @@ func (task *Task) Run() hcl.Diagnostics {
 	%s`, task.Command.String)
 	command := exec.Command(terminal, "-c", script)
 	output, err := command.Output()
-	if output != nil {
-		outStr := string(output)
-		task.StdOut = &outStr
+	task.StdOut = values.EventualString{
+		String: strings.TrimSpace(string(output)),
+		Valid:  true,
 	}
 	// todo: keep a ref to command.ProcessState since it contains useful info
 	// like process time, exit code, etc
-	code := command.ProcessState.ExitCode()
-	task.ExitCode = &code
-	if err != nil {
-		if ee, ok := err.(*exec.ExitError); ok {
-			stderr := string(ee.Stderr)
-			task.StdErr = &stderr
-		}
+	task.ExitCode = values.EventualInt64{
+		Int64: int64(command.ProcessState.ExitCode()),
+		Valid: true,
 	}
 
 	if err != nil {
+		if ee, ok := err.(*exec.ExitError); ok {
+			task.StdErr = values.EventualString{
+				String: strings.TrimSpace(string(ee.Stderr)),
+				Valid:  true,
+			}
+		}
+
 		return hcl.Diagnostics{{
 			Severity: hcl.DiagError,
 			Summary:  fmt.Sprintf("%s failed with %s", task.Command.String, err.Error()),
