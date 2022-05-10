@@ -3,6 +3,7 @@ package internal
 import (
 	"bake/internal/lang"
 	"github.com/hashicorp/hcl/v2"
+	"github.com/hashicorp/hcl/v2/gohcl"
 	"github.com/zclconf/go-cty/cty"
 )
 
@@ -16,7 +17,7 @@ func (target Target) Path() cty.Path {
 	return cty.GetAttrPath(target.Name)
 }
 
-func NewTarget(block *hcl.Block, ctx *hcl.EvalContext) (*Target, hcl.Diagnostics) {
+func NewTarget(block *hcl.Block, ctx *hcl.EvalContext) (Action, hcl.Diagnostics) {
 	content, diags := block.Body.Content(lang.TargetSchema())
 	if diags.HasErrors() {
 		return nil, diags
@@ -27,14 +28,16 @@ func NewTarget(block *hcl.Block, ctx *hcl.EvalContext) (*Target, hcl.Diagnostics
 		return nil, diagnostics
 	}
 
-	filename, diagnostics := lang.String(lang.FilenameAttr, content.Attributes, ctx)
-	if diagnostics.HasErrors() {
-		return nil, diagnostics
+	var filename string
+	diags = gohcl.DecodeExpression(content.Attributes[lang.FilenameAttr].Expr, ctx, &filename)
+	if diags.HasErrors() {
+		return nil, diags
 	}
 
-	sources, diagnostics := lang.ListOfStrings(lang.SourcesAttr, content.Attributes, ctx)
-	if diagnostics.HasErrors() {
-		return nil, diagnostics
+	sources := make([]string, 0)
+	diags = gohcl.DecodeExpression(content.Attributes[lang.SourcesAttr].Expr, ctx, &sources)
+	if diags.HasErrors() {
+		return nil, diags
 	}
 
 	return &Target{

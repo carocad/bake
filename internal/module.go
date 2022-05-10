@@ -49,26 +49,27 @@ func (module *Module) GetContent(file *hcl.File, filename string) hcl.Diagnostic
 	for _, block := range content.Blocks {
 		switch block.Type {
 		case lang.PhonyLabel:
-			phony, diags := NewPhony(block, context)
+			action, diags := NewPhony(block, context)
 			if diags.HasErrors() {
 				return diags
 			}
-			module.Actions = append(module.Actions, phony)
+			module.Actions = append(module.Actions, action)
 		case lang.TargetLabel:
-			target, diags := NewTarget(block, context)
+			action, diags := NewTarget(block, context)
 			if diags.HasErrors() {
 				return diags
 			}
-			module.Actions = append(module.Actions, target)
-		}
-
-		if diags.HasErrors() {
-			return diags
+			module.Actions = append(module.Actions, action)
 		}
 	}
 
 	// todo: loop over all actions again and "settle" the unknown vars
-
+	/*
+		context, diags = module.EvalContext(filename)
+		if diags.HasErrors() {
+			return diags
+		}
+	*/
 	return nil
 }
 
@@ -81,9 +82,19 @@ func (module Module) EvalContext(filename string) (*hcl.EvalContext, hcl.Diagnos
 		}),
 	}
 
+	phonyPrefix := cty.GetAttrPath(lang.PhonyLabel)
+	phony := map[string]cty.Value{}
 	for _, action := range module.Actions {
-		ctx[action.GetName()] = cty.ObjectVal(values.CTY(action))
+		name := action.GetName()
+		path := action.Path()
+		if path.HasPrefix(phonyPrefix) {
+			phony[name] = cty.ObjectVal(values.CTY(action))
+			continue
+		}
+		// only targets for now !!
+		ctx[name] = cty.ObjectVal(values.CTY(action))
 	}
+	ctx[lang.PhonyLabel] = cty.ObjectVal(phony)
 
 	return &hcl.EvalContext{
 		Variables: ctx,
@@ -109,8 +120,9 @@ type actionMark struct {
 // NOTE: the task itself is the last element of the dependency list
 func (module Module) Dependencies(task Action) ([]Action, hcl.Diagnostics) {
 	markers := make(map[string]*actionMark)
-	markers[task.GetName()] = &actionMark{task, unmarked}
-	order, diags := module.visit(task.GetName(), markers)
+	path := PathString(task.Path())
+	markers[path] = &actionMark{task, unmarked}
+	order, diags := module.visit(path, markers)
 	if diags.HasErrors() {
 		return nil, diags
 	}
@@ -143,11 +155,12 @@ func (module Module) visit(current string, markers map[string]*actionMark) ([]Ac
 		}
 
 		// make sure we initialize the marker
-		if _, found := markers[innerID.GetName()]; !found {
-			markers[innerID.GetName()] = &actionMark{innerID, unmarked}
+		path := PathString(innerID.Path())
+		if _, found := markers[path]; !found {
+			markers[path] = &actionMark{innerID, unmarked}
 		}
 
-		inner, diags := module.visit(innerID.GetName(), markers)
+		inner, diags := module.visit(path, markers)
 		if diags.HasErrors() {
 			for _, diag := range diags {
 				if diag.Summary == cyclicalDependency {
@@ -196,9 +209,29 @@ func ToPath(traversal hcl.Traversal) cty.Path {
 	return path
 }
 
-// TargetScope is not necessary since those are "attached" directly to the "module"
-const (
-	PhonyScope  = "phony"
-	LocalScope  = "local"
-	ModuleScope = "module"
-)
+func PathString(path cty.Path) string {
+	result := ""
+	for _, step := range path {
+		switch ss := step.(type) {
+		case cty.GetAttrStep:
+			if result == "" {
+				result = ss.Name
+			} else {
+				result += "." + ss.Name
+			}
+		case cty.IndexStep:
+			switch ss.Key.Type() {
+			case cty.Number:
+				// todo: is this ok?
+				result += fmt.Sprintf("[%d]", ss.Key.AsBigFloat())
+			case cty.String:
+				result += fmt.Sprintf("[%s]", ss.Key.AsString())
+			default:
+				// this implies a 🐞 in the code
+				panic("key value not number or string")
+			}
+		}
+	}
+
+	return result
+}

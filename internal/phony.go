@@ -11,10 +11,10 @@ type Phony struct {
 }
 
 func (phony Phony) Path() cty.Path {
-	return cty.GetAttrPath(PhonyScope).GetAttr(phony.Name)
+	return cty.GetAttrPath(lang.PhonyLabel).GetAttr(phony.Name)
 }
 
-func NewPhony(block *hcl.Block, ctx *hcl.EvalContext) (*Phony, hcl.Diagnostics) {
+func NewPhony(block *hcl.Block, ctx *hcl.EvalContext) (Action, hcl.Diagnostics) {
 	content, diagnostics := block.Body.Content(lang.PhonySchema())
 	if diagnostics.HasErrors() {
 		return nil, diagnostics

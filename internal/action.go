@@ -6,7 +6,9 @@ import (
 	"os/exec"
 
 	"bake/internal/lang"
+	"bake/internal/lang/values"
 	"github.com/hashicorp/hcl/v2"
+	"github.com/hashicorp/hcl/v2/gohcl"
 	"github.com/zclconf/go-cty/cty"
 )
 
@@ -17,6 +19,23 @@ const (
 	Running
 	Completed
 )
+
+type Action interface {
+	GetName() string
+	Dependencies() []hcl.Traversal
+	Status() EventualStatus
+	Run() hcl.Diagnostics
+
+	// Settle forces evaluation of expressions that depend on other
+	// actions
+	// Settle() hcl.Diagnostics
+
+	Addressable
+}
+
+type Addressable interface {
+	Path() cty.Path
+}
 
 type Task struct {
 	Name        string
@@ -33,19 +52,23 @@ type Task struct {
 }
 
 func NewTask(name string, attrs hcl.Attributes, ctx *hcl.EvalContext) (*Task, hcl.Diagnostics) {
-	command, diagnostics := lang.String(lang.CommandAttr, attrs, ctx)
-	if diagnostics.HasErrors() {
-		return nil, diagnostics
+	var command string
+	diags := gohcl.DecodeExpression(attrs[lang.CommandAttr].Expr, ctx, &command)
+	if diags.HasErrors() {
+		return nil, diags
 	}
 
-	description, diagnostics := lang.String(lang.DescriptionAttr, attrs, ctx)
-	if diagnostics.HasErrors() {
-		return nil, diagnostics
+	var description string
+	if attr, ok := attrs[lang.DescriptionAttr]; ok {
+		diags = gohcl.DecodeExpression(attr.Expr, ctx, &description)
+		if diags.HasErrors() {
+			return nil, diags
+		}
 	}
 
-	deps, diagnostics := dependsOn(attrs)
-	if diagnostics.HasErrors() {
-		return nil, diagnostics
+	deps, diags := dependsOn(attrs)
+	if diags.HasErrors() {
+		return nil, diags
 	}
 
 	return &Task{
@@ -56,19 +79,8 @@ func NewTask(name string, attrs hcl.Attributes, ctx *hcl.EvalContext) (*Task, hc
 	}, nil
 }
 
-type Action interface {
-	GetName() string // todo: do I need a "special" getname method?
-	Dependencies() []hcl.Traversal
-	Status() EventualStatus
-	Run() hcl.Diagnostics
-	// Settle forces evaluation of expressions that depend on other
-	// actions
-	// Settle() hcl.Diagnostics
-	Addressable
-}
-
-type Addressable interface {
-	Path() cty.Path
+func (task Task) CTY() cty.Value {
+	return cty.ObjectVal(values.CTY(task))
 }
 
 func (task Task) GetName() string {
