@@ -61,6 +61,9 @@ type Action interface {
 	Dependencies() []hcl.Traversal
 	Status() EventualStatus
 	Run() hcl.Diagnostics
+	// Settle forces evaluation of expressions that depend on other
+	// actions
+	// Settle() hcl.Diagnostics
 	Addressable
 }
 

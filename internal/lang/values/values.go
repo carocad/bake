@@ -1,4 +1,4 @@
-package internal
+package values
 
 import (
 	"fmt"
@@ -9,10 +9,10 @@ import (
 
 // check json.typeFields for inspiration of reflect logic
 
-// Value converts go lang structs into cty maps automatically.
+// CTY converts go lang structs into cty maps automatically.
 // By convention nil pointers are represented as cty.UnknownVal
 // and once known the pointer should be set to an appropriate value
-func Value(instance interface{}) map[string]cty.Value {
+func CTY(instance interface{}) map[string]cty.Value {
 	result := map[string]cty.Value{}
 	val := reflect.Indirect(reflect.ValueOf(instance))
 	for index := 0; index < val.NumField(); index++ {
@@ -25,9 +25,18 @@ func Value(instance interface{}) map[string]cty.Value {
 		name := ToSnakeCase(field.Name)
 		switch field.Type.Kind() {
 		case reflect.Struct:
-			inner := Value(val.Field(index).Interface())
-			for key, value := range inner {
-				result[key] = value
+			if reflect.PointerTo(field.Type).Implements(eventualType) {
+				m, ok := val.Field(index).Interface().(Eventual)
+				if !ok {
+					panic("value MUST implement Eventual interface")
+				}
+
+				result[name] = m.CTY()
+			} else {
+				inner := CTY(val.Field(index).Interface())
+				for key, value := range inner {
+					result[key] = value
+				}
 			}
 		case reflect.Pointer:
 			ptrType := field.Type.Elem()

@@ -16,6 +16,7 @@ const (
 	FilenameAttr    = "filename"
 	SourcesAttr     = "sources"
 	DependsOnAttr   = "depends_on"
+	ForEachAttr     = "for_each"
 )
 
 func RecipeSchema() *hcl.BodySchema {
@@ -59,6 +60,9 @@ func PhonySchema() *hcl.BodySchema {
 		Required: true,
 	}, {
 		Name:     DependsOnAttr,
+		Required: false,
+	}, {
+		Name:     ForEachAttr,
 		Required: false,
 	}}}
 }

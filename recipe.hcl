@@ -6,25 +6,31 @@ phony "main" {
 
 target "first" {
   filename = "cmd/main.bin"
-  command = "go build -o cmd/main.bin cmd/main.go"
-  sources = ["cmd/main.go"]
+  command  = "go build -o cmd/main.bin cmd/main.go"
+  sources  = ["cmd/main.go"]
 
   depends_on = [phony.second]
 }
 
 phony "second" {
-  command = "pwd"
+  // command = "echo 'hello ${phony.third.command}'"
+  command = "echo 'hello world'"
 }
 
+phony "third" {
+  command = "echo 'world'"
+}
 
+// todo: enable for_each
+// todo: enable phony.data as convention for getting information
 /*
-target "first" {
-  command = "how to say ${second.command}"
+phony "data" {
+  for_each = {
+    version  = "git describe --tags --abbrev=0"
+    revision = "git rev-parse --short HEAD"
+    branch   = "git rev-parse --abbrev-ref HEAD | tr A-Z/ a-z-"
+  }
 
-  depends_on = [phony.second]
-}
-
-phony "second" {
-  command = "the cow says ${path.current}"
+  command = each.value
 }
 */

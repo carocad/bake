@@ -5,6 +5,7 @@ import (
 	"path/filepath"
 
 	"bake/internal/lang"
+	"bake/internal/lang/values"
 	"github.com/hashicorp/hcl/v2"
 	"github.com/zclconf/go-cty/cty"
 )
@@ -66,6 +67,8 @@ func (module *Module) GetContent(file *hcl.File, filename string) hcl.Diagnostic
 		}
 	}
 
+	// todo: loop over all actions again and "settle" the unknown vars
+
 	return nil
 }
 
@@ -79,7 +82,7 @@ func (module Module) EvalContext(filename string) (*hcl.EvalContext, hcl.Diagnos
 	}
 
 	for _, action := range module.Actions {
-		ctx[action.GetName()] = cty.ObjectVal(Value(action))
+		ctx[action.GetName()] = cty.ObjectVal(values.CTY(action))
 	}
 
 	return &hcl.EvalContext{
