@@ -5,14 +5,14 @@ import (
 	"os"
 	"path/filepath"
 
-	module2 "bake/internal/module"
+	"bake/internal/module"
 	"bake/internal/module/action"
 	"github.com/hashicorp/hcl/v2"
 	"github.com/hashicorp/hcl/v2/hclparse"
 )
 
 type System struct {
-	root   *module2.Module // the root module
+	root   *module.Module // the root module
 	parser *hclparse.Parser
 	cwd    string
 	Logger hcl.DiagnosticWriter
@@ -34,7 +34,7 @@ func NewSystem() (*System, hcl.Diagnostics) {
 	}
 
 	return &System{
-		root:   module2.NewRootModule(cwd),
+		root:   module.NewRootModule(cwd),
 		parser: parser,
 		Logger: logger,
 		cwd:    cwd,

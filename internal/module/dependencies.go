@@ -55,7 +55,7 @@ func (module Module) visit(current string, markers map[string]*actionMark) ([]ac
 	id.mark = temporary
 	order := make([]action.Action, 0)
 	for _, dep := range id.Dependencies() {
-		innerID, diags := module.getByID(dep)
+		innerID, diags := module.getByPrefix(dep)
 		if diags.HasErrors() {
 			return nil, diags
 		}
@@ -83,10 +83,10 @@ func (module Module) visit(current string, markers map[string]*actionMark) ([]ac
 	return order, nil
 }
 
-func (module Module) getByID(traversal hcl.Traversal) (action.Action, hcl.Diagnostics) {
+func (module Module) getByPrefix(traversal hcl.Traversal) (action.Action, hcl.Diagnostics) {
 	path := lang.ToPath(traversal)
 	for _, act := range module.actions {
-		if act.Path().Equals(path) {
+		if path.HasPrefix(act.Path()) {
 			return act, nil
 		}
 	}

@@ -10,12 +10,12 @@ import (
 	"bake/internal/values"
 	"github.com/hashicorp/hcl/v2"
 	"github.com/hashicorp/hcl/v2/gohcl"
-	"github.com/zclconf/go-cty/cty"
 )
 
 type Task struct {
 	Name        string
-	Command     string
+	Command     values.EventualString
+	commandExpr hcl.Expression
 	Description string
 	// todo: this might be quite big so better clean it up if not used by any other task
 	// todo: make these pointers to allow cty.UnknownValue based on status
@@ -24,39 +24,37 @@ type Task struct {
 	ExitCode *int
 	// internal only
 	dependsOn []hcl.Traversal
-	status    EventualStatus
 }
 
 func NewTask(name string, attrs hcl.Attributes, ctx *hcl.EvalContext) (*Task, hcl.Diagnostics) {
-	var command string
-	diags := gohcl.DecodeExpression(attrs[lang.CommandAttr].Expr, ctx, &command)
-	if diags.HasErrors() {
-		return nil, diags
-	}
-
 	var description string
 	if attr, ok := attrs[lang.DescriptionAttr]; ok {
-		diags = gohcl.DecodeExpression(attr.Expr, ctx, &description)
+		diags := gohcl.DecodeExpression(attr.Expr, ctx, &description)
 		if diags.HasErrors() {
 			return nil, diags
 		}
 	}
 
-	deps, diags := dependsOn(attrs)
-	if diags.HasErrors() {
-		return nil, diags
+	dependsOn := make([]hcl.Traversal, 0)
+	if attr, ok := attrs[lang.DependsOnAttr]; ok {
+		variables, diags := lang.TupleOfReferences(attr)
+		if diags.HasErrors() {
+			return nil, diags
+		}
+
+		dependsOn = append(dependsOn, variables...)
 	}
+
+	commandExpr := attrs[lang.CommandAttr].Expr
+	dependsOn = append(dependsOn, commandExpr.Variables()...)
 
 	return &Task{
 		Name:        name,
-		Command:     command,
+		Command:     values.EventualString{Valid: false},
+		commandExpr: commandExpr,
 		Description: description,
-		dependsOn:   deps,
+		dependsOn:   dependsOn,
 	}, nil
-}
-
-func (task Task) CTY() cty.Value {
-	return cty.ObjectVal(values.CTY(task))
 }
 
 func (task Task) GetName() string {
@@ -67,14 +65,26 @@ func (task Task) Dependencies() []hcl.Traversal {
 	return task.dependsOn
 }
 
-func (task Task) Status() EventualStatus {
-	return task.status
+func (task *Task) Preload(ctx *hcl.EvalContext) hcl.Diagnostics {
+	if task.Command.Valid {
+		return nil
+	}
+
+	var command string
+	diags := gohcl.DecodeExpression(task.commandExpr, ctx, &command)
+	if diags.HasErrors() {
+		return diags
+	}
+
+	task.Command = values.EventualString{
+		String: command,
+		Valid:  true,
+	}
+
+	return nil
 }
 
 func (task *Task) Run() hcl.Diagnostics {
-	task.status = Running
-	defer func() { task.status = Completed }()
-
 	log.Println("executing " + task.Name)
 
 	terminal := "bash"
@@ -86,7 +96,7 @@ func (task *Task) Run() hcl.Diagnostics {
 	script := fmt.Sprintf(`
 	set -euo pipefail
 
-	%s`, task.Command)
+	%s`, task.Command.String)
 	command := exec.Command(terminal, "-c", script)
 	output, err := command.Output()
 	if output != nil {
@@ -107,7 +117,7 @@ func (task *Task) Run() hcl.Diagnostics {
 	if err != nil {
 		return hcl.Diagnostics{{
 			Severity: hcl.DiagError,
-			Summary:  fmt.Sprintf("%s failed with %s", task.Command, err.Error()),
+			Summary:  fmt.Sprintf("%s failed with %s", task.Command.String, err.Error()),
 		}}
 	}
 

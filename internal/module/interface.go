@@ -22,8 +22,18 @@ func (module Module) Plan(target string) ([]action.Action, hcl.Diagnostics) {
 			return nil, diags
 		}
 
-		// pre-load phony.data and locals ...
+		// preload phony.data and locals ...
 		for _, dep := range deps {
+			context, diags := module.currentContext()
+			if diags.HasErrors() {
+				return nil, diags
+			}
+
+			diags = dep.Preload(context)
+			if diags.HasErrors() {
+				return nil, diags
+			}
+
 			if !dep.Path().Equals(phonyData) {
 				continue
 			}

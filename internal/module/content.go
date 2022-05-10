@@ -16,7 +16,7 @@ func (module *Module) GetContent(file *hcl.File, filename string) hcl.Diagnostic
 		return diags
 	}
 
-	context, diags := module.evalContext(filename)
+	context, diags := module.parsingContext(filename)
 	if diags.HasErrors() {
 		return diags
 	}
@@ -38,17 +38,10 @@ func (module *Module) GetContent(file *hcl.File, filename string) hcl.Diagnostic
 		}
 	}
 
-	// todo: loop over all actions again and "settle" the unknown vars
-	/*
-		context, diags = module.evalContext(filename)
-		if diags.HasErrors() {
-			return diags
-		}
-	*/
 	return nil
 }
 
-func (module Module) evalContext(filename string) (*hcl.EvalContext, hcl.Diagnostics) {
+func (module Module) parsingContext(filename string) (*hcl.EvalContext, hcl.Diagnostics) {
 	ctx := map[string]cty.Value{
 		"path": cty.ObjectVal(map[string]cty.Value{
 			"root":    cty.StringVal(module.cwd),
@@ -56,6 +49,15 @@ func (module Module) evalContext(filename string) (*hcl.EvalContext, hcl.Diagnos
 			"current": cty.StringVal(filepath.Join(module.cwd, filename)),
 		}),
 	}
+
+	return &hcl.EvalContext{
+		Variables: ctx,
+		Functions: lang.Functions(),
+	}, nil
+}
+
+func (module Module) currentContext() (*hcl.EvalContext, hcl.Diagnostics) {
+	ctx := map[string]cty.Value{}
 
 	phonyPrefix := cty.GetAttrPath(lang.PhonyLabel)
 	phony := map[string]cty.Value{}
@@ -66,11 +68,12 @@ func (module Module) evalContext(filename string) (*hcl.EvalContext, hcl.Diagnos
 			phony[name] = cty.ObjectVal(values.CTY(act))
 			continue
 		}
+
 		// only targets for now !!
 		ctx[name] = cty.ObjectVal(values.CTY(act))
 	}
-	ctx[lang.PhonyLabel] = cty.ObjectVal(phony)
 
+	ctx[lang.PhonyLabel] = cty.ObjectVal(phony)
 	return &hcl.EvalContext{
 		Variables: ctx,
 		Functions: lang.Functions(),

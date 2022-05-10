@@ -24,8 +24,9 @@ func CTY(instance interface{}) map[string]cty.Value {
 		}
 
 		name := ToSnakeCase(field.Name)
+		fieldInterface := fieldValue.Interface()
 		if reflect.PointerTo(field.Type).Implements(eventualType) {
-			m, ok := fieldValue.Interface().(Eventual)
+			m, ok := fieldInterface.(Eventual)
 			if !ok {
 				panic("value MUST implement Eventual interface")
 			}
@@ -34,12 +35,19 @@ func CTY(instance interface{}) map[string]cty.Value {
 			continue
 		}
 
-		item := fieldValue.Interface()
-		impliedType, err := gocty.ImpliedType(item)
+		if field.Type.Kind() == reflect.Struct {
+			m := CTY(fieldInterface)
+			for k, v := range m {
+				result[k] = v
+			}
+			continue
+		}
+
+		impliedType, err := gocty.ImpliedType(fieldInterface)
 		if err != nil {
 			panic(err) // should never be reached -> implies a 🐞 in the code
 		}
-		value, err := gocty.ToCtyValue(fieldValue.Interface(), impliedType)
+		value, err := gocty.ToCtyValue(fieldInterface, impliedType)
 		result[name] = value
 	}
 
