@@ -5,7 +5,6 @@ import (
 
 	"bake/internal/lang"
 	"bake/internal/module/action"
-	"bake/internal/values"
 	"github.com/hashicorp/hcl/v2"
 	"github.com/zclconf/go-cty/cty"
 )
@@ -73,14 +72,15 @@ func (module Module) currentContext() (*hcl.EvalContext, hcl.Diagnostics) {
 	for _, act := range module.addresses {
 		name := act.GetName()
 		path := act.Path()
+		value := act.CTY()
 		switch {
 		case path.HasPrefix(phonyPrefix):
-			phony[name] = values.CTY(act)
+			phony[name] = value
 		case path.HasPrefix(localPrefix):
-			local[name] = values.CTY(act)
+			local[name] = value
 		default:
 			// only targets for now !!
-			ctx[name] = values.CTY(act)
+			ctx[name] = value
 		}
 	}
 

@@ -1,6 +1,7 @@
 package values
 
 import (
+	"fmt"
 	"reflect"
 
 	"github.com/zclconf/go-cty/cty"
@@ -9,20 +10,8 @@ import (
 
 // check json.typeFields for inspiration of reflect logic
 
-// CTY converts go lang structs into cty maps automatically.
-// By convention nil pointers are represented as cty.UnknownVal
-// and once known the pointer should be set to an appropriate value
-func CTY(instance interface{}) cty.Value {
+func StructToCty(instance interface{}) cty.Value {
 	val := reflect.Indirect(reflect.ValueOf(instance))
-	if reflect.PointerTo(val.Type()).Implements(eventualType) {
-		m, ok := instance.(Eventual)
-		if !ok {
-			panic("value MUST implement Eventual interface")
-		}
-
-		return m.CTY()
-	}
-
 	result := map[string]cty.Value{}
 	for index := 0; index < val.NumField(); index++ {
 		field := val.Type().Field(index)
@@ -32,31 +21,24 @@ func CTY(instance interface{}) cty.Value {
 			continue
 		}
 
-		name := ToSnakeCase(field.Name)
 		fieldInterface := fieldValue.Interface()
-		if reflect.PointerTo(field.Type).Implements(eventualType) {
-			m, ok := fieldInterface.(Eventual)
-			if !ok {
-				panic("value MUST implement Eventual interface")
-			}
-
-			result[name] = m.CTY()
+		name := ToSnakeCase(field.Name)
+		if v, ok := fieldInterface.(Cty); ok {
+			result[name] = v.CTY()
 			continue
 		}
 
-		if field.Type.Kind() == reflect.Struct {
-			m := CTY(fieldInterface)
-			for k, v := range m.AsValueMap() {
-				result[k] = v
-			}
-			continue
-		}
-
+		// handle primitives conversions
 		impliedType, err := gocty.ImpliedType(fieldInterface)
-		if err != nil {
-			panic(err) // should never be reached -> implies a 🐞 in the code
+		if err != nil { // should never be reached -> implies a 🐞 in the code
+			panic(fmt.Sprintf("couldn't find implied type: %s", err))
 		}
+
 		value, err := gocty.ToCtyValue(fieldInterface, impliedType)
+		if err != nil { // should never be reached -> implies a 🐞 in the code
+			panic(fmt.Sprintf("couldn't convert instance type: %s", err))
+		}
+
 		result[name] = value
 	}
 

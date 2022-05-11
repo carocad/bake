@@ -11,6 +11,7 @@ import (
 	"bake/internal/values"
 	"github.com/hashicorp/hcl/v2"
 	"github.com/hashicorp/hcl/v2/gohcl"
+	"github.com/zclconf/go-cty/cty"
 )
 
 type Task struct {
@@ -56,6 +57,28 @@ func NewTask(name string, attrs hcl.Attributes, ctx *hcl.EvalContext) (*Task, hc
 		Description: description,
 		dependsOn:   dependsOn,
 	}, nil
+}
+
+// CtyTask is a convenience function to "flatten" any struct
+// that might embed Task
+func CtyTask(instance interface{}) cty.Value {
+	c := values.StructToCty(instance)
+	result := map[string]cty.Value{}
+	for k, v := range c.AsValueMap() {
+		if k == "task" {
+			for k2, v2 := range v.AsValueMap() {
+				result[k2] = v2
+			}
+			continue
+		}
+		result[k] = v
+	}
+
+	return cty.ObjectVal(result)
+}
+
+func (task Task) CTY() cty.Value {
+	return values.StructToCty(task)
 }
 
 func (task Task) GetName() string {

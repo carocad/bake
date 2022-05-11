@@ -1,16 +1,14 @@
 package values
 
 import (
-	"reflect"
-
 	"github.com/zclconf/go-cty/cty"
 )
 
-type Eventual interface {
+// Cty allows structs to customize the way they are
+// converted to cty.Value
+type Cty interface {
 	CTY() cty.Value
 }
-
-var eventualType = reflect.TypeOf((*Eventual)(nil)).Elem()
 
 type EventualString struct {
 	String string

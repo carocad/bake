@@ -10,10 +10,6 @@ type Phony struct {
 	Task
 }
 
-func (phony Phony) Path() cty.Path {
-	return cty.GetAttrPath(lang.PhonyLabel).GetAttr(phony.Name)
-}
-
 func NewPhony(block *hcl.Block, ctx *hcl.EvalContext) (Address, hcl.Diagnostics) {
 	content, diagnostics := block.Body.Content(lang.PhonySchema())
 	if diagnostics.HasErrors() {
@@ -26,4 +22,12 @@ func NewPhony(block *hcl.Block, ctx *hcl.EvalContext) (Address, hcl.Diagnostics)
 	}
 
 	return &Phony{*task}, nil
+}
+
+func (phony Phony) CTY() cty.Value {
+	return CtyTask(phony)
+}
+
+func (phony Phony) Path() cty.Path {
+	return cty.GetAttrPath(lang.PhonyLabel).GetAttr(phony.Name)
 }
