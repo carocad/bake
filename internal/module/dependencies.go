@@ -96,7 +96,7 @@ func (module Module) getByPrefix(traversal hcl.Traversal) (action.Address, hcl.D
 	suggestion := module.suggest(path)
 	summary := "unknown reference"
 	if suggestion != "" {
-		summary += fmt.Sprintf(", Did you mean '%s'?", suggestion)
+		summary += fmt.Sprintf(`, Did you mean "%s"?`, suggestion)
 	}
 
 	return nil, hcl.Diagnostics{{

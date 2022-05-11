@@ -12,7 +12,7 @@ phony "main" {
 target "first" {
   filename = local.binary
   command  = "go build -o ${local.binary} ${local.main}"
-  sources  = ["cmd/main.go"]
+  sources  = [local.main]
 
   depends_on = [phony.second]
 }
