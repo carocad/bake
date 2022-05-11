@@ -17,15 +17,17 @@ import (
 type Task struct {
 	Name        string
 	Command     values.EventualString
-	commandExpr hcl.Expression
 	Description string
+
 	// todo: this might be quite big so better clean it up if not used by any other task
 	// todo: make these pointers to allow cty.UnknownValue based on status
 	StdOut   values.EventualString
 	StdErr   values.EventualString
 	ExitCode values.EventualInt64
+
 	// internal only
-	dependsOn []hcl.Traversal
+	commandExpr hcl.Expression
+	dependsOn   []hcl.Traversal
 }
 
 func NewTask(name string, attrs hcl.Attributes, ctx *hcl.EvalContext) (*Task, hcl.Diagnostics) {

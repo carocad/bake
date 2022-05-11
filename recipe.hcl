@@ -1,5 +1,6 @@
 locals {
-  hello = "main"
+  main = "cmd/main.go"
+  binary = replace(local.main, ".go", ".bin")
 }
 
 phony "main" {
@@ -9,8 +10,8 @@ phony "main" {
 }
 
 target "first" {
-  filename = "cmd/main.bin"
-  command  = "go build -o cmd/${local.hello}.${phony.data.std_out}.bin cmd/main.go"
+  filename = local.binary
+  command  = "go build -o ${local.binary} ${local.main}"
   sources  = ["cmd/main.go"]
 
   depends_on = [phony.second]

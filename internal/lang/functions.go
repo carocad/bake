@@ -45,6 +45,7 @@ func Functions() map[string]function.Function {
 		"range":           stdlib.RangeFunc,
 		"regex":           stdlib.RegexFunc,
 		"regexall":        stdlib.RegexAllFunc,
+		"replace":         stdlib.ReplaceFunc,
 		"reverse":         stdlib.ReverseListFunc,
 		"setintersection": stdlib.SetIntersectionFunc,
 		"setproduct":      stdlib.SetProductFunc,

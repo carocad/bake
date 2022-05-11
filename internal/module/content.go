@@ -65,8 +65,6 @@ func (module Module) parsingContext(filename string) (*hcl.EvalContext, hcl.Diag
 func (module Module) currentContext() (*hcl.EvalContext, hcl.Diagnostics) {
 	ctx := map[string]cty.Value{}
 
-	phonyPrefix := cty.GetAttrPath(lang.PhonyLabel)
-	localPrefix := cty.GetAttrPath(lang.LocalScope)
 	phony := map[string]cty.Value{}
 	local := map[string]cty.Value{}
 	for _, act := range module.addresses {

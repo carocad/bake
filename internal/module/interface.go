@@ -9,11 +9,19 @@ import (
 
 const dataName = "data"
 
-var phonyData = cty.GetAttrPath(lang.PhonyLabel).GetAttr(dataName)
+var (
+	phonyData   = cty.GetAttrPath(lang.PhonyLabel).GetAttr(dataName)
+	phonyPrefix = cty.GetAttrPath(lang.PhonyLabel)
+	localPrefix = cty.GetAttrPath(lang.LocalScope)
+)
 
 func (module Module) Plan(target string) ([]action.Action, hcl.Diagnostics) {
 	allActions := make([]action.Action, 0)
 	for _, act := range module.addresses {
+		if act.Path().HasPrefix(localPrefix) {
+			continue
+		}
+
 		if act.GetName() != target {
 			continue
 		}
