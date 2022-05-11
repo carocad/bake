@@ -5,7 +5,9 @@ import (
 
 	"bake/internal/lang"
 	"bake/internal/module/action"
+	"github.com/agext/levenshtein"
 	"github.com/hashicorp/hcl/v2"
+	"github.com/zclconf/go-cty/cty"
 )
 
 type mark int
@@ -91,9 +93,31 @@ func (module Module) getByPrefix(traversal hcl.Traversal) (action.Address, hcl.D
 		}
 	}
 
+	suggestion := module.suggest(path)
+	summary := "unknown reference"
+	if suggestion != "" {
+		summary += fmt.Sprintf(", Did you mean '%s'?", suggestion)
+	}
+
 	return nil, hcl.Diagnostics{{
 		Severity: hcl.DiagError,
-		Summary:  "unknown reference",
+		Summary:  summary,
 		Subject:  traversal.SourceRange().Ptr(),
 	}}
+}
+
+func (module Module) suggest(search cty.Path) string {
+	searchText := lang.PathString(search)
+	suggestion := ""
+	bestDistance := len(searchText)
+	for _, addr := range module.addresses {
+		typo := lang.PathString(addr.Path())
+		dist := levenshtein.Distance(searchText, typo, nil)
+		if dist < bestDistance {
+			suggestion = typo
+			bestDistance = dist
+		}
+	}
+
+	return suggestion
 }
