@@ -87,8 +87,9 @@ func (task *Task) Plan(ctx *hcl.EvalContext) ([]Action, hcl.Diagnostics) {
 
 func (task *Task) Apply() hcl.Diagnostics {
 	if task.ExitCode.Valid {
-
+		return nil
 	}
+
 	log.Println("executing " + task.Name)
 
 	terminal := "bash"
