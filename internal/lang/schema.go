@@ -6,8 +6,12 @@ import "github.com/hashicorp/hcl/v2"
 const (
 	TargetLabel = "target"
 	PhonyLabel  = "phony"
+	LocalsLabel = "locals"
 	NameLabel   = "name"
 )
+
+// LocalScope only for locals since the scope != label
+const LocalScope = "local"
 
 // attributes
 const (
@@ -28,6 +32,9 @@ func RecipeSchema() *hcl.BodySchema {
 		}, {
 			Type:       PhonyLabel,
 			LabelNames: []string{NameLabel},
+		}, {
+			Type:       LocalsLabel,
+			LabelNames: []string{},
 		}},
 	}
 }

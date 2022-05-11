@@ -6,18 +6,12 @@ import (
 )
 
 type Action interface {
-	GetName() string
-	Dependencies() []hcl.Traversal
-	Run() hcl.Diagnostics
-	Preload(ctx *hcl.EvalContext) hcl.Diagnostics
-
-	// Settle forces evaluation of expressions that depend on other
-	// actions
-	// Settle() hcl.Diagnostics
-
-	Addressable
+	Apply() hcl.Diagnostics
 }
 
-type Addressable interface {
+type Address interface {
+	GetName() string
 	Path() cty.Path
+	Dependencies() []hcl.Traversal
+	Plan(ctx *hcl.EvalContext) ([]Action, hcl.Diagnostics)
 }

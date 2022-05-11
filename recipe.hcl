@@ -1,3 +1,7 @@
+locals {
+  hello = "main"
+}
+
 phony "main" {
   command = "echo 'I did it :)'"
 
@@ -6,7 +10,7 @@ phony "main" {
 
 target "first" {
   filename = "cmd/main.bin"
-  command  = "go build -o cmd/${phony.data.std_out}.bin cmd/main.go"
+  command  = "go build -o cmd/${local.hello}.${phony.data.std_out}.bin cmd/main.go"
   sources  = ["cmd/main.go"]
 
   depends_on = [phony.second]

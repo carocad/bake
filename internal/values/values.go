@@ -12,9 +12,18 @@ import (
 // CTY converts go lang structs into cty maps automatically.
 // By convention nil pointers are represented as cty.UnknownVal
 // and once known the pointer should be set to an appropriate value
-func CTY(instance interface{}) map[string]cty.Value {
-	result := map[string]cty.Value{}
+func CTY(instance interface{}) cty.Value {
 	val := reflect.Indirect(reflect.ValueOf(instance))
+	if reflect.PointerTo(val.Type()).Implements(eventualType) {
+		m, ok := instance.(Eventual)
+		if !ok {
+			panic("value MUST implement Eventual interface")
+		}
+
+		return m.CTY()
+	}
+
+	result := map[string]cty.Value{}
 	for index := 0; index < val.NumField(); index++ {
 		field := val.Type().Field(index)
 		fieldValue := val.Field(index)
@@ -37,7 +46,7 @@ func CTY(instance interface{}) map[string]cty.Value {
 
 		if field.Type.Kind() == reflect.Struct {
 			m := CTY(fieldInterface)
-			for k, v := range m {
+			for k, v := range m.AsValueMap() {
 				result[k] = v
 			}
 			continue
@@ -51,5 +60,5 @@ func CTY(instance interface{}) map[string]cty.Value {
 		result[name] = value
 	}
 
-	return result
+	return cty.ObjectVal(result)
 }

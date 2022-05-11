@@ -28,13 +28,20 @@ func (module *Module) GetContent(file *hcl.File, filename string) hcl.Diagnostic
 			if diags.HasErrors() {
 				return diags
 			}
-			module.actions = append(module.actions, act)
+			module.addresses = append(module.addresses, act)
 		case lang.TargetLabel:
 			act, diags := action.NewTarget(block, context)
 			if diags.HasErrors() {
 				return diags
 			}
-			module.actions = append(module.actions, act)
+			module.addresses = append(module.addresses, act)
+		case lang.LocalsLabel:
+			attributes, diags := block.Body.JustAttributes()
+			if diags.HasErrors() {
+				return diags
+			}
+			locals := action.NewLocals(attributes)
+			module.addresses = append(module.addresses, locals...)
 		}
 	}
 
@@ -60,20 +67,25 @@ func (module Module) currentContext() (*hcl.EvalContext, hcl.Diagnostics) {
 	ctx := map[string]cty.Value{}
 
 	phonyPrefix := cty.GetAttrPath(lang.PhonyLabel)
+	localPrefix := cty.GetAttrPath(lang.LocalScope)
 	phony := map[string]cty.Value{}
-	for _, act := range module.actions {
+	local := map[string]cty.Value{}
+	for _, act := range module.addresses {
 		name := act.GetName()
 		path := act.Path()
-		if path.HasPrefix(phonyPrefix) {
-			phony[name] = cty.ObjectVal(values.CTY(act))
-			continue
+		switch {
+		case path.HasPrefix(phonyPrefix):
+			phony[name] = values.CTY(act)
+		case path.HasPrefix(localPrefix):
+			local[name] = values.CTY(act)
+		default:
+			// only targets for now !!
+			ctx[name] = values.CTY(act)
 		}
-
-		// only targets for now !!
-		ctx[name] = cty.ObjectVal(values.CTY(act))
 	}
 
 	ctx[lang.PhonyLabel] = cty.ObjectVal(phony)
+	ctx[lang.LocalScope] = cty.ObjectVal(local)
 	return &hcl.EvalContext{
 		Variables: ctx,
 		Functions: lang.Functions(),

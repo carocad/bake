@@ -14,7 +14,7 @@ func (phony Phony) Path() cty.Path {
 	return cty.GetAttrPath(lang.PhonyLabel).GetAttr(phony.Name)
 }
 
-func NewPhony(block *hcl.Block, ctx *hcl.EvalContext) (Action, hcl.Diagnostics) {
+func NewPhony(block *hcl.Block, ctx *hcl.EvalContext) (Address, hcl.Diagnostics) {
 	content, diagnostics := block.Body.Content(lang.PhonySchema())
 	if diagnostics.HasErrors() {
 		return nil, diagnostics

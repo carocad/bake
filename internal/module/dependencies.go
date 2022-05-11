@@ -16,18 +16,18 @@ const (
 	permanent
 )
 
-type actionMark struct {
-	action.Action
+type addressMark struct {
+	action.Address
 	mark
 }
 
 // dependencies according to
 // https://www.wikiwand.com/en/Topological_sorting#/Depth-first_search
 // NOTE: the task itself is the last element of the dependency list
-func (module Module) dependencies(task action.Action) ([]action.Action, hcl.Diagnostics) {
-	markers := make(map[string]*actionMark)
-	path := lang.PathString(task.Path())
-	markers[path] = &actionMark{task, unmarked}
+func (module Module) dependencies(addr action.Address) ([]action.Address, hcl.Diagnostics) {
+	markers := make(map[string]*addressMark)
+	path := lang.PathString(addr.Path())
+	markers[path] = &addressMark{addr, unmarked}
 	order, diags := module.visit(path, markers)
 	if diags.HasErrors() {
 		return nil, diags
@@ -38,7 +38,7 @@ func (module Module) dependencies(task action.Action) ([]action.Action, hcl.Diag
 
 const cyclicalDependency = "cyclical dependency detected"
 
-func (module Module) visit(current string, markers map[string]*actionMark) ([]action.Action, hcl.Diagnostics) {
+func (module Module) visit(current string, markers map[string]*addressMark) ([]action.Address, hcl.Diagnostics) {
 	id := markers[current]
 	if id.mark == permanent {
 		return nil, nil
@@ -53,7 +53,7 @@ func (module Module) visit(current string, markers map[string]*actionMark) ([]ac
 	}
 
 	id.mark = temporary
-	order := make([]action.Action, 0)
+	order := make([]action.Address, 0)
 	for _, dep := range id.Dependencies() {
 		innerID, diags := module.getByPrefix(dep)
 		if diags.HasErrors() {
@@ -63,7 +63,7 @@ func (module Module) visit(current string, markers map[string]*actionMark) ([]ac
 		// make sure we initialize the marker
 		path := lang.PathString(innerID.Path())
 		if _, found := markers[path]; !found {
-			markers[path] = &actionMark{innerID, unmarked}
+			markers[path] = &addressMark{innerID, unmarked}
 		}
 
 		inner, diags := module.visit(path, markers)
@@ -79,13 +79,13 @@ func (module Module) visit(current string, markers map[string]*actionMark) ([]ac
 		order = append(order, inner...)
 	}
 	id.mark = permanent
-	order = append(order, id.Action)
+	order = append(order, id.Address)
 	return order, nil
 }
 
-func (module Module) getByPrefix(traversal hcl.Traversal) (action.Action, hcl.Diagnostics) {
+func (module Module) getByPrefix(traversal hcl.Traversal) (action.Address, hcl.Diagnostics) {
 	path := lang.ToPath(traversal)
-	for _, act := range module.actions {
+	for _, act := range module.addresses {
 		if path.HasPrefix(act.Path()) {
 			return act, nil
 		}

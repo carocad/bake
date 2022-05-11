@@ -12,7 +12,8 @@ const dataName = "data"
 var phonyData = cty.GetAttrPath(lang.PhonyLabel).GetAttr(dataName)
 
 func (module Module) Plan(target string) ([]action.Action, hcl.Diagnostics) {
-	for _, act := range module.actions {
+	allActions := make([]action.Action, 0)
+	for _, act := range module.addresses {
 		if act.GetName() != target {
 			continue
 		}
@@ -22,29 +23,34 @@ func (module Module) Plan(target string) ([]action.Action, hcl.Diagnostics) {
 			return nil, diags
 		}
 
-		// preload phony.data and locals ...
 		for _, dep := range deps {
 			context, diags := module.currentContext()
 			if diags.HasErrors() {
 				return nil, diags
 			}
 
-			diags = dep.Preload(context)
+			actions, diags := dep.Plan(context)
 			if diags.HasErrors() {
 				return nil, diags
 			}
 
+			allActions = append(allActions, actions...)
+
+			// preload phony.data and locals ...
 			if !dep.Path().Equals(phonyData) {
 				continue
 			}
 
-			diags = dep.Run()
-			if diags.HasErrors() {
-				return nil, diags
+			// refactor this
+			for _, act := range actions {
+				diags := act.Apply()
+				if diags.HasErrors() {
+					return nil, diags
+				}
 			}
 		}
 
-		return deps, nil
+		return allActions, nil
 	}
 
 	return nil, hcl.Diagnostics{{

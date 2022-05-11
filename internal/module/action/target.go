@@ -17,7 +17,7 @@ func (target Target) Path() cty.Path {
 	return cty.GetAttrPath(target.Name)
 }
 
-func NewTarget(block *hcl.Block, ctx *hcl.EvalContext) (Action, hcl.Diagnostics) {
+func NewTarget(block *hcl.Block, ctx *hcl.EvalContext) (Address, hcl.Diagnostics) {
 	content, diags := block.Body.Content(lang.TargetSchema())
 	if diags.HasErrors() {
 		return nil, diags

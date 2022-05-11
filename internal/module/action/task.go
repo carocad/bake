@@ -66,15 +66,15 @@ func (task Task) Dependencies() []hcl.Traversal {
 	return task.dependsOn
 }
 
-func (task *Task) Preload(ctx *hcl.EvalContext) hcl.Diagnostics {
+func (task *Task) Plan(ctx *hcl.EvalContext) ([]Action, hcl.Diagnostics) {
 	if task.Command.Valid {
-		return nil
+		return nil, nil
 	}
 
 	var command string
 	diags := gohcl.DecodeExpression(task.commandExpr, ctx, &command)
 	if diags.HasErrors() {
-		return diags
+		return nil, diags
 	}
 
 	task.Command = values.EventualString{
@@ -82,10 +82,10 @@ func (task *Task) Preload(ctx *hcl.EvalContext) hcl.Diagnostics {
 		Valid:  true,
 	}
 
-	return nil
+	return []Action{task}, nil
 }
 
-func (task *Task) Run() hcl.Diagnostics {
+func (task *Task) Apply() hcl.Diagnostics {
 	if task.ExitCode.Valid {
 
 	}
