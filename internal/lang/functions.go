@@ -1,7 +1,6 @@
 package lang
 
 import (
-	"github.com/hashicorp/hcl/v2/ext/tryfunc"
 	"github.com/zclconf/go-cty/cty/function"
 	"github.com/zclconf/go-cty/cty/function/stdlib"
 )
@@ -14,7 +13,6 @@ import (
 func Functions() map[string]function.Function {
 	return map[string]function.Function{
 		"abs":             stdlib.AbsoluteFunc,
-		"can":             tryfunc.CanFunc,
 		"ceil":            stdlib.CeilFunc,
 		"chomp":           stdlib.ChompFunc,
 		"coalescelist":    stdlib.CoalesceListFunc,
@@ -63,7 +61,6 @@ func Functions() map[string]function.Function {
 		"trimprefix":      stdlib.TrimPrefixFunc,
 		"trimspace":       stdlib.TrimSpaceFunc,
 		"trimsuffix":      stdlib.TrimSuffixFunc,
-		"try":             tryfunc.TryFunc,
 		"upper":           stdlib.UpperFunc,
 		"values":          stdlib.ValuesFunc,
 		"zipmap":          stdlib.ZipmapFunc,

@@ -1,21 +1,14 @@
 package module
 
 import (
-	"path/filepath"
-
 	"bake/internal/lang"
 	"bake/internal/module/action"
 	"github.com/hashicorp/hcl/v2"
 	"github.com/zclconf/go-cty/cty"
 )
 
-func (module *Module) GetContent(file *hcl.File, filename string) hcl.Diagnostics {
+func (module *Module) GetContent(file *hcl.File, ctx *hcl.EvalContext) hcl.Diagnostics {
 	content, diags := file.Body.Content(lang.RecipeSchema())
-	if diags.HasErrors() {
-		return diags
-	}
-
-	context, diags := module.parsingContext(filename)
 	if diags.HasErrors() {
 		return diags
 	}
@@ -23,13 +16,13 @@ func (module *Module) GetContent(file *hcl.File, filename string) hcl.Diagnostic
 	for _, block := range content.Blocks {
 		switch block.Type {
 		case lang.PhonyLabel:
-			act, diags := action.NewPhony(block, context)
+			act, diags := action.NewPhony(block, ctx)
 			if diags.HasErrors() {
 				return diags
 			}
 			module.addresses = append(module.addresses, act)
 		case lang.TargetLabel:
-			act, diags := action.NewTarget(block, context)
+			act, diags := action.NewTarget(block, ctx)
 			if diags.HasErrors() {
 				return diags
 			}
@@ -45,21 +38,6 @@ func (module *Module) GetContent(file *hcl.File, filename string) hcl.Diagnostic
 	}
 
 	return nil
-}
-
-func (module Module) parsingContext(filename string) (*hcl.EvalContext, hcl.Diagnostics) {
-	ctx := map[string]cty.Value{
-		"path": cty.ObjectVal(map[string]cty.Value{
-			"root":    cty.StringVal(module.cwd),
-			"module":  cty.StringVal(filepath.Join(module.cwd, filepath.Dir(filename))),
-			"current": cty.StringVal(filepath.Join(module.cwd, filename)),
-		}),
-	}
-
-	return &hcl.EvalContext{
-		Variables: ctx,
-		Functions: lang.Functions(),
-	}, nil
 }
 
 func (module Module) currentContext() (*hcl.EvalContext, hcl.Diagnostics) {

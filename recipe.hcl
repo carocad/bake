@@ -18,8 +18,7 @@ target "first" {
 }
 
 phony "second" {
-  // command = "echo 'hello ${phony.third.command}'"
-  command = "echo 'hello world'"
+  command = "echo 'hello ${path.module}'"
 }
 
 phony "data" {
