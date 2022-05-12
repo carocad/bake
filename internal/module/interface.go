@@ -16,9 +16,14 @@ var (
 	pathPrefix  = cty.GetAttrPath(lang.PathScope)
 )
 
-func (module Module) Plan(target string) ([]action.Action, hcl.Diagnostics) {
+func (module Module) Plan(target string, fileAddrs FileMapping) ([]action.Action, hcl.Diagnostics) {
 	allActions := make([]action.Action, 0)
-	for filename, addresses := range module.fileAddresses {
+	sorter := topologicalSort{
+		fileAddrs: fileAddrs,
+		markers:   map[string]*addressMark{},
+		global:    cty.NewPathSet(pathPrefix),
+	}
+	for filename, addresses := range fileAddrs {
 		for _, act := range addresses {
 
 			if act.Path().HasPrefix(localPrefix) {
@@ -29,13 +34,13 @@ func (module Module) Plan(target string) ([]action.Action, hcl.Diagnostics) {
 				continue
 			}
 
-			deps, diags := module.dependencies(act)
+			deps, diags := sorter.dependencies(act)
 			if diags.HasErrors() {
 				return nil, diags
 			}
 
 			for _, dep := range deps {
-				context, diags := module.currentContext(filename)
+				context, diags := module.currentContext(filename, fileAddrs)
 				if diags.HasErrors() {
 					return nil, diags
 				}

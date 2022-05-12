@@ -41,10 +41,11 @@ func NewSystem() (*System, hcl.Diagnostics) {
 	}, nil
 }
 
-func (state System) readRecipes() hcl.Diagnostics {
+func (state System) readRecipes() (module.FileMapping, hcl.Diagnostics) {
+	fileAddresses := module.FileMapping{}
 	files, err := ioutil.ReadDir(state.cwd)
 	if err != nil {
-		return hcl.Diagnostics{{
+		return nil, hcl.Diagnostics{{
 			Severity: hcl.DiagError,
 			Summary:  "couldn't read files in " + state.cwd,
 			Detail:   err.Error(),
@@ -59,25 +60,27 @@ func (state System) readRecipes() hcl.Diagnostics {
 		// read the file but don't decode it yet
 		f, diags := state.parser.ParseHCLFile(filename.Name())
 		if diags.HasErrors() {
-			return diags
+			return nil, diags
 		}
 
-		diags = state.root.GetContent(f, filename.Name())
+		addrs, diags := state.root.GetContent(f, filename.Name())
 		if diags.HasErrors() {
-			return diags
+			return nil, diags
 		}
+
+		fileAddresses[filename.Name()] = addrs
 	}
 
-	return nil
+	return fileAddresses, nil
 }
 
 func (state System) Plan(target string) ([]action.Action, hcl.Diagnostics) {
-	diags := state.readRecipes()
+	addrs, diags := state.readRecipes()
 	if diags.HasErrors() {
 		return nil, diags
 	}
 
-	actions, diags := state.root.Plan(target)
+	actions, diags := state.root.Plan(target, addrs)
 	if diags.HasErrors() {
 		return nil, diags
 	}

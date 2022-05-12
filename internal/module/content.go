@@ -9,45 +9,46 @@ import (
 	"github.com/zclconf/go-cty/cty"
 )
 
-func (module *Module) GetContent(file *hcl.File, filename string) hcl.Diagnostics {
-	ctx, diags := module.currentContext(filename)
+func (module *Module) GetContent(file *hcl.File, filename string) ([]action.Address, hcl.Diagnostics) {
+	ctx, diags := module.currentContext(filename, nil)
 	if diags.HasErrors() {
-		return diags
+		return nil, diags
 	}
 
 	content, diags := file.Body.Content(lang.RecipeSchema())
 	if diags.HasErrors() {
-		return diags
+		return nil, diags
 	}
 
+	addrs := make([]action.Address, 0)
 	for _, block := range content.Blocks {
 		switch block.Type {
 		case lang.PhonyLabel:
 			act, diags := action.NewPhony(block, ctx)
 			if diags.HasErrors() {
-				return diags
+				return nil, diags
 			}
-			module.fileAddresses[filename] = append(module.fileAddresses[filename], act)
+			addrs = append(addrs, act)
 		case lang.TargetLabel:
 			act, diags := action.NewTarget(block, ctx)
 			if diags.HasErrors() {
-				return diags
+				return nil, diags
 			}
-			module.fileAddresses[filename] = append(module.fileAddresses[filename], act)
+			addrs = append(addrs, act)
 		case lang.LocalsLabel:
 			attributes, diags := block.Body.JustAttributes()
 			if diags.HasErrors() {
-				return diags
+				return nil, diags
 			}
 			locals := action.NewLocals(attributes)
-			module.fileAddresses[filename] = append(module.fileAddresses[filename], locals...)
+			addrs = append(addrs, locals...)
 		}
 	}
 
-	return nil
+	return addrs, nil
 }
 
-func (module Module) currentContext(filename string) (*hcl.EvalContext, hcl.Diagnostics) {
+func (module Module) currentContext(filename string, fileAddrs FileMapping) (*hcl.EvalContext, hcl.Diagnostics) {
 	variables := map[string]cty.Value{
 		"path": cty.ObjectVal(map[string]cty.Value{
 			"root":    cty.StringVal(module.cwd),
@@ -58,7 +59,7 @@ func (module Module) currentContext(filename string) (*hcl.EvalContext, hcl.Diag
 
 	phony := map[string]cty.Value{}
 	local := map[string]cty.Value{}
-	for _, addresses := range module.fileAddresses {
+	for _, addresses := range fileAddrs {
 		for _, act := range addresses {
 			name := act.GetName()
 			path := act.Path()
