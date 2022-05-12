@@ -10,8 +10,12 @@ const (
 	NameLabel   = "name"
 )
 
-// LocalScope only for locals since the scope != label
-const LocalScope = "local"
+const (
+	// LocalScope only for locals since the scope != label
+	LocalScope = "local"
+	// PathScope is automatically injected
+	PathScope = "path"
+)
 
 // attributes
 const (

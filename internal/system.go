@@ -5,12 +5,10 @@ import (
 	"os"
 	"path/filepath"
 
-	"bake/internal/lang"
 	"bake/internal/module"
 	"bake/internal/module/action"
 	"github.com/hashicorp/hcl/v2"
 	"github.com/hashicorp/hcl/v2/hclparse"
-	"github.com/zclconf/go-cty/cty"
 )
 
 type System struct {
@@ -64,18 +62,7 @@ func (state System) readRecipes() hcl.Diagnostics {
 			return diags
 		}
 
-		ctx := &hcl.EvalContext{
-			Functions: lang.Functions(),
-			Variables: map[string]cty.Value{
-				"path": cty.ObjectVal(map[string]cty.Value{
-					"root":    cty.StringVal(state.cwd),
-					"module":  cty.StringVal(filepath.Join(state.cwd, filepath.Dir(filename.Name()))),
-					"current": cty.StringVal(filepath.Join(state.cwd, filename.Name())),
-				}),
-			},
-		}
-
-		diags = state.root.GetContent(f, ctx.NewChild())
+		diags = state.root.GetContent(f, filename.Name())
 		if diags.HasErrors() {
 			return diags
 		}

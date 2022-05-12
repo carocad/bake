@@ -13,47 +13,51 @@ var (
 	phonyData   = cty.GetAttrPath(lang.PhonyLabel).GetAttr(dataName)
 	phonyPrefix = cty.GetAttrPath(lang.PhonyLabel)
 	localPrefix = cty.GetAttrPath(lang.LocalScope)
+	pathPrefix  = cty.GetAttrPath(lang.PathScope)
 )
 
 func (module Module) Plan(target string) ([]action.Action, hcl.Diagnostics) {
 	allActions := make([]action.Action, 0)
-	for _, act := range module.addresses {
-		if act.Path().HasPrefix(localPrefix) {
-			continue
-		}
+	for filename, addresses := range module.fileAddresses {
+		for _, act := range addresses {
 
-		if act.GetName() != target {
-			continue
-		}
-
-		deps, diags := module.dependencies(act)
-		if diags.HasErrors() {
-			return nil, diags
-		}
-
-		for _, dep := range deps {
-			context, diags := module.currentContext()
-			if diags.HasErrors() {
-				return nil, diags
-			}
-
-			actions, diags := dep.Plan(context)
-			if diags.HasErrors() {
-				return nil, diags
-			}
-
-			allActions = append(allActions, actions...)
-
-			// preload phony.data and locals ...
-			if !dep.Path().Equals(phonyData) {
+			if act.Path().HasPrefix(localPrefix) {
 				continue
 			}
 
-			// refactor this
-			for _, act := range actions {
-				diags := act.Apply()
+			if act.GetName() != target {
+				continue
+			}
+
+			deps, diags := module.dependencies(act)
+			if diags.HasErrors() {
+				return nil, diags
+			}
+
+			for _, dep := range deps {
+				context, diags := module.currentContext(filename)
 				if diags.HasErrors() {
 					return nil, diags
+				}
+
+				actions, diags := dep.Plan(context)
+				if diags.HasErrors() {
+					return nil, diags
+				}
+
+				allActions = append(allActions, actions...)
+
+				// preload phony.data and locals ...
+				if !dep.Path().Equals(phonyData) {
+					continue
+				}
+
+				// refactor this
+				for _, act := range actions {
+					diags := act.Apply()
+					if diags.HasErrors() {
+						return nil, diags
+					}
 				}
 			}
 		}

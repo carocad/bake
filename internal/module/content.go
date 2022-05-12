@@ -1,13 +1,20 @@
 package module
 
 import (
+	"path/filepath"
+
 	"bake/internal/lang"
 	"bake/internal/module/action"
 	"github.com/hashicorp/hcl/v2"
 	"github.com/zclconf/go-cty/cty"
 )
 
-func (module *Module) GetContent(file *hcl.File, ctx *hcl.EvalContext) hcl.Diagnostics {
+func (module *Module) GetContent(file *hcl.File, filename string) hcl.Diagnostics {
+	ctx, diags := module.currentContext(filename)
+	if diags.HasErrors() {
+		return diags
+	}
+
 	content, diags := file.Body.Content(lang.RecipeSchema())
 	if diags.HasErrors() {
 		return diags
@@ -20,50 +27,58 @@ func (module *Module) GetContent(file *hcl.File, ctx *hcl.EvalContext) hcl.Diagn
 			if diags.HasErrors() {
 				return diags
 			}
-			module.addresses = append(module.addresses, act)
+			module.fileAddresses[filename] = append(module.fileAddresses[filename], act)
 		case lang.TargetLabel:
 			act, diags := action.NewTarget(block, ctx)
 			if diags.HasErrors() {
 				return diags
 			}
-			module.addresses = append(module.addresses, act)
+			module.fileAddresses[filename] = append(module.fileAddresses[filename], act)
 		case lang.LocalsLabel:
 			attributes, diags := block.Body.JustAttributes()
 			if diags.HasErrors() {
 				return diags
 			}
 			locals := action.NewLocals(attributes)
-			module.addresses = append(module.addresses, locals...)
+			module.fileAddresses[filename] = append(module.fileAddresses[filename], locals...)
 		}
 	}
 
 	return nil
 }
 
-func (module Module) currentContext() (*hcl.EvalContext, hcl.Diagnostics) {
-	ctx := map[string]cty.Value{}
+func (module Module) currentContext(filename string) (*hcl.EvalContext, hcl.Diagnostics) {
+	variables := map[string]cty.Value{
+		"path": cty.ObjectVal(map[string]cty.Value{
+			"root":    cty.StringVal(module.cwd),
+			"module":  cty.StringVal(filepath.Join(module.cwd, filepath.Dir(filename))),
+			"current": cty.StringVal(filepath.Join(module.cwd, filename)),
+		}),
+	}
 
 	phony := map[string]cty.Value{}
 	local := map[string]cty.Value{}
-	for _, act := range module.addresses {
-		name := act.GetName()
-		path := act.Path()
-		value := act.CTY()
-		switch {
-		case path.HasPrefix(phonyPrefix):
-			phony[name] = value
-		case path.HasPrefix(localPrefix):
-			local[name] = value
-		default:
-			// only targets for now !!
-			ctx[name] = value
+	for _, addresses := range module.fileAddresses {
+		for _, act := range addresses {
+			name := act.GetName()
+			path := act.Path()
+			value := act.CTY()
+			switch {
+			case path.HasPrefix(phonyPrefix):
+				phony[name] = value
+			case path.HasPrefix(localPrefix):
+				local[name] = value
+			default:
+				// only targets for now !!
+				variables[name] = value
+			}
 		}
 	}
 
-	ctx[lang.PhonyLabel] = cty.ObjectVal(phony)
-	ctx[lang.LocalScope] = cty.ObjectVal(local)
+	variables[lang.PhonyLabel] = cty.ObjectVal(phony)
+	variables[lang.LocalScope] = cty.ObjectVal(local)
 	return &hcl.EvalContext{
-		Variables: ctx,
+		Variables: variables,
 		Functions: lang.Functions(),
 	}, nil
 }

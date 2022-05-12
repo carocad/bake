@@ -57,6 +57,10 @@ func (module Module) visit(current string, markers map[string]*addressMark) ([]a
 	id.mark = temporary
 	order := make([]action.Address, 0)
 	for _, dep := range id.Dependencies() {
+		if module.ignoreRef(dep) {
+			continue
+		}
+
 		innerID, diags := module.getByPrefix(dep)
 		if diags.HasErrors() {
 			return nil, diags
@@ -87,16 +91,18 @@ func (module Module) visit(current string, markers map[string]*addressMark) ([]a
 
 func (module Module) getByPrefix(traversal hcl.Traversal) (action.Address, hcl.Diagnostics) {
 	path := lang.ToPath(traversal)
-	for _, act := range module.addresses {
-		if path.HasPrefix(act.Path()) {
-			return act, nil
+	for _, addresses := range module.fileAddresses {
+		for _, act := range addresses {
+			if path.HasPrefix(act.Path()) {
+				return act, nil
+			}
 		}
 	}
 
 	suggestion := module.suggest(path)
 	summary := "unknown reference"
 	if suggestion != "" {
-		summary += fmt.Sprintf(`, Did you mean "%s"?`, suggestion)
+		summary += fmt.Sprintf(`, did you mean "%s"?`, suggestion)
 	}
 
 	return nil, hcl.Diagnostics{{
@@ -106,16 +112,22 @@ func (module Module) getByPrefix(traversal hcl.Traversal) (action.Address, hcl.D
 	}}
 }
 
+func (module Module) ignoreRef(traversal hcl.Traversal) bool {
+	return lang.ToPath(traversal).HasPrefix(pathPrefix)
+}
+
 func (module Module) suggest(search cty.Path) string {
 	searchText := lang.PathString(search)
 	suggestion := ""
 	bestDistance := len(searchText)
-	for _, addr := range module.addresses {
-		typo := lang.PathString(addr.Path())
-		dist := levenshtein.Distance(searchText, typo, nil)
-		if dist < bestDistance {
-			suggestion = typo
-			bestDistance = dist
+	for _, addresses := range module.fileAddresses {
+		for _, addr := range addresses {
+			typo := lang.PathString(addr.Path())
+			dist := levenshtein.Distance(searchText, typo, nil)
+			if dist < bestDistance {
+				suggestion = typo
+				bestDistance = dist
+			}
 		}
 	}
 

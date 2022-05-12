@@ -6,7 +6,7 @@ import (
 )
 
 type Module struct {
-	addresses []action.Address
+	fileAddresses map[string][]action.Address
 	// name by which the module is known; by convention the root module
 	// doesn't have a name as it is "global"
 	name string
@@ -18,7 +18,7 @@ func NewRootModule(cwd string) *Module {
 }
 
 func NewModule(name, cwd string) *Module {
-	return &Module{name: name, cwd: cwd}
+	return &Module{name: name, cwd: cwd, fileAddresses: map[string][]action.Address{}}
 }
 
 func (module Module) Path() cty.Path {
