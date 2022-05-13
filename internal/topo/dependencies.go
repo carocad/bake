@@ -4,14 +4,13 @@ import (
 	"fmt"
 
 	"bake/internal/lang"
-	"bake/internal/module/action"
 	"github.com/agext/levenshtein"
 	"github.com/hashicorp/hcl/v2"
 	"github.com/zclconf/go-cty/cty"
 )
 
 type depthFirst struct {
-	fileAddrs map[string][]action.Address
+	fileAddrs map[string][]lang.RawAddress
 	markers   map[string]*addressMark
 	global    cty.PathSet
 }
@@ -25,14 +24,14 @@ const (
 )
 
 type addressMark struct {
-	action.Address
+	lang.RawAddress
 	mark
 }
 
 // Dependencies sorting according to
 // https://www.wikiwand.com/en/Topological_sorting#/Depth-first_search
 // NOTE: the task itself is the last element of the dependency list
-func Dependencies(addr action.Address, fileAddrs map[string][]action.Address, globals cty.PathSet) ([]action.Address, hcl.Diagnostics) {
+func Dependencies(addr lang.RawAddress, fileAddrs map[string][]lang.RawAddress, globals cty.PathSet) ([]lang.RawAddress, hcl.Diagnostics) {
 	path := lang.PathString(addr.Path())
 	sorter := depthFirst{
 		fileAddrs: fileAddrs,
@@ -52,7 +51,7 @@ func Dependencies(addr action.Address, fileAddrs map[string][]action.Address, gl
 
 const cyclicalDependency = "cyclical dependency detected"
 
-func (sorter depthFirst) visit(current string) ([]action.Address, hcl.Diagnostics) {
+func (sorter depthFirst) visit(current string) ([]lang.RawAddress, hcl.Diagnostics) {
 	id := sorter.markers[current]
 	if id.mark == permanent {
 		return nil, nil
@@ -67,8 +66,13 @@ func (sorter depthFirst) visit(current string) ([]action.Address, hcl.Diagnostic
 	}
 
 	id.mark = temporary
-	order := make([]action.Address, 0)
-	for _, dep := range id.Dependencies() {
+	order := make([]lang.RawAddress, 0)
+	dependencies, diagnostics := id.Dependencies()
+	if diagnostics.HasErrors() {
+		return nil, diagnostics
+	}
+
+	for _, dep := range dependencies {
 		if sorter.ignoreRef(dep) {
 			continue
 		}
@@ -97,11 +101,11 @@ func (sorter depthFirst) visit(current string) ([]action.Address, hcl.Diagnostic
 		order = append(order, inner...)
 	}
 	id.mark = permanent
-	order = append(order, id.Address)
+	order = append(order, id.RawAddress)
 	return order, nil
 }
 
-func (sorter depthFirst) getByPrefix(traversal hcl.Traversal) (action.Address, hcl.Diagnostics) {
+func (sorter depthFirst) getByPrefix(traversal hcl.Traversal) (lang.RawAddress, hcl.Diagnostics) {
 	path := lang.ToPath(traversal)
 	for _, addresses := range sorter.fileAddrs {
 		for _, act := range addresses {

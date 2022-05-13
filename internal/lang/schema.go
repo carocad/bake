@@ -1,6 +1,9 @@
 package lang
 
-import "github.com/hashicorp/hcl/v2"
+import (
+	"github.com/hashicorp/hcl/v2"
+	"github.com/zclconf/go-cty/cty"
+)
 
 // labels
 const (
@@ -41,6 +44,19 @@ func RecipeSchema() *hcl.BodySchema {
 			LabelNames: []string{},
 		}},
 	}
+}
+
+type Local struct {
+	addressAttribute
+	value cty.Value
+}
+
+func (l Local) Apply() hcl.Diagnostics {
+	return nil
+}
+
+func (l Local) CTY() cty.Value {
+	return l.value
 }
 
 func TargetSchema() *hcl.BodySchema {

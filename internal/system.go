@@ -5,8 +5,8 @@ import (
 	"os"
 	"path/filepath"
 
+	"bake/internal/lang"
 	"bake/internal/module"
-	"bake/internal/module/action"
 	"github.com/hashicorp/hcl/v2"
 	"github.com/hashicorp/hcl/v2/hclparse"
 )
@@ -41,8 +41,8 @@ func NewSystem() (*System, hcl.Diagnostics) {
 	}, nil
 }
 
-func (state System) readRecipes() (module.FileMapping, hcl.Diagnostics) {
-	fileAddresses := module.FileMapping{}
+func (state System) readRecipes() (map[string][]lang.RawAddress, hcl.Diagnostics) {
+	fileAddresses := map[string][]lang.RawAddress{}
 	files, err := ioutil.ReadDir(state.cwd)
 	if err != nil {
 		return nil, hcl.Diagnostics{{
@@ -63,7 +63,7 @@ func (state System) readRecipes() (module.FileMapping, hcl.Diagnostics) {
 			return nil, diags
 		}
 
-		addrs, diags := state.root.GetContent(f, filename.Name())
+		addrs, diags := state.root.GetContent(f)
 		if diags.HasErrors() {
 			return nil, diags
 		}
@@ -74,7 +74,7 @@ func (state System) readRecipes() (module.FileMapping, hcl.Diagnostics) {
 	return fileAddresses, nil
 }
 
-func (state System) Plan(target string) ([]action.Action, hcl.Diagnostics) {
+func (state System) Plan(target string) ([]lang.Action, hcl.Diagnostics) {
 	addrs, diags := state.readRecipes()
 	if diags.HasErrors() {
 		return nil, diags
