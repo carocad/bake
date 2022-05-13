@@ -10,11 +10,6 @@ import (
 )
 
 func (module *Module) GetContent(file *hcl.File, filename string) ([]action.Address, hcl.Diagnostics) {
-	ctx, diags := module.currentContext(filename, nil)
-	if diags.HasErrors() {
-		return nil, diags
-	}
-
 	content, diags := file.Body.Content(lang.RecipeSchema())
 	if diags.HasErrors() {
 		return nil, diags
@@ -24,13 +19,13 @@ func (module *Module) GetContent(file *hcl.File, filename string) ([]action.Addr
 	for _, block := range content.Blocks {
 		switch block.Type {
 		case lang.PhonyLabel:
-			act, diags := action.NewPhony(block, ctx)
+			act, diags := action.NewPhony(block, nil)
 			if diags.HasErrors() {
 				return nil, diags
 			}
 			addrs = append(addrs, act)
 		case lang.TargetLabel:
-			act, diags := action.NewTarget(block, ctx)
+			act, diags := action.NewTarget(block, nil)
 			if diags.HasErrors() {
 				return nil, diags
 			}

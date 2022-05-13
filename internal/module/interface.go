@@ -3,6 +3,7 @@ package module
 import (
 	"bake/internal/lang"
 	"bake/internal/module/action"
+	"bake/internal/topo"
 	"github.com/hashicorp/hcl/v2"
 	"github.com/zclconf/go-cty/cty"
 )
@@ -14,15 +15,13 @@ var (
 	phonyPrefix = cty.GetAttrPath(lang.PhonyLabel)
 	localPrefix = cty.GetAttrPath(lang.LocalScope)
 	pathPrefix  = cty.GetAttrPath(lang.PathScope)
+	// globalPrefixes are those automatically injected by bake instead of defined by
+	// user input
+	globalPrefixes = cty.NewPathSet(pathPrefix)
 )
 
 func (module Module) Plan(target string, fileAddrs FileMapping) ([]action.Action, hcl.Diagnostics) {
 	allActions := make([]action.Action, 0)
-	sorter := topologicalSort{
-		fileAddrs: fileAddrs,
-		markers:   map[string]*addressMark{},
-		global:    cty.NewPathSet(pathPrefix),
-	}
 	for filename, addresses := range fileAddrs {
 		for _, act := range addresses {
 
@@ -34,7 +33,7 @@ func (module Module) Plan(target string, fileAddrs FileMapping) ([]action.Action
 				continue
 			}
 
-			deps, diags := sorter.dependencies(act)
+			deps, diags := topo.Dependencies(act, fileAddrs, globalPrefixes)
 			if diags.HasErrors() {
 				return nil, diags
 			}

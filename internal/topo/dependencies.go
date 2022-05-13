@@ -1,4 +1,4 @@
-package module
+package topo
 
 import (
 	"fmt"
@@ -10,11 +10,8 @@ import (
 	"github.com/zclconf/go-cty/cty"
 )
 
-// dependencies according to
-// https://www.wikiwand.com/en/Topological_sorting#/Depth-first_search
-// NOTE: the task itself is the last element of the dependency list
-type topologicalSort struct {
-	fileAddrs FileMapping
+type depthFirst struct {
+	fileAddrs map[string][]action.Address
 	markers   map[string]*addressMark
 	global    cty.PathSet
 }
@@ -32,10 +29,20 @@ type addressMark struct {
 	mark
 }
 
-func (topo topologicalSort) dependencies(addr action.Address) ([]action.Address, hcl.Diagnostics) {
+// Dependencies sorting according to
+// https://www.wikiwand.com/en/Topological_sorting#/Depth-first_search
+// NOTE: the task itself is the last element of the dependency list
+func Dependencies(addr action.Address, fileAddrs map[string][]action.Address, globals cty.PathSet) ([]action.Address, hcl.Diagnostics) {
 	path := lang.PathString(addr.Path())
-	topo.markers[path] = &addressMark{addr, unmarked}
-	order, diags := topo.visit(path)
+	sorter := depthFirst{
+		fileAddrs: fileAddrs,
+		markers: map[string]*addressMark{
+			path: {addr, unmarked},
+		},
+		global: globals,
+	}
+
+	order, diags := sorter.visit(path)
 	if diags.HasErrors() {
 		return nil, diags
 	}
@@ -45,8 +52,8 @@ func (topo topologicalSort) dependencies(addr action.Address) ([]action.Address,
 
 const cyclicalDependency = "cyclical dependency detected"
 
-func (topo topologicalSort) visit(current string) ([]action.Address, hcl.Diagnostics) {
-	id := topo.markers[current]
+func (sorter depthFirst) visit(current string) ([]action.Address, hcl.Diagnostics) {
+	id := sorter.markers[current]
 	if id.mark == permanent {
 		return nil, nil
 	}
@@ -62,22 +69,22 @@ func (topo topologicalSort) visit(current string) ([]action.Address, hcl.Diagnos
 	id.mark = temporary
 	order := make([]action.Address, 0)
 	for _, dep := range id.Dependencies() {
-		if topo.ignoreRef(dep) {
+		if sorter.ignoreRef(dep) {
 			continue
 		}
 
-		innerID, diags := topo.getByPrefix(dep)
+		innerID, diags := sorter.getByPrefix(dep)
 		if diags.HasErrors() {
 			return nil, diags
 		}
 
 		// make sure we initialize the marker
 		path := lang.PathString(innerID.Path())
-		if _, found := topo.markers[path]; !found {
-			topo.markers[path] = &addressMark{innerID, unmarked}
+		if _, found := sorter.markers[path]; !found {
+			sorter.markers[path] = &addressMark{innerID, unmarked}
 		}
 
-		inner, diags := topo.visit(path)
+		inner, diags := sorter.visit(path)
 		if diags.HasErrors() {
 			for _, diag := range diags {
 				if diag.Summary == cyclicalDependency {
@@ -94,9 +101,9 @@ func (topo topologicalSort) visit(current string) ([]action.Address, hcl.Diagnos
 	return order, nil
 }
 
-func (topo topologicalSort) getByPrefix(traversal hcl.Traversal) (action.Address, hcl.Diagnostics) {
+func (sorter depthFirst) getByPrefix(traversal hcl.Traversal) (action.Address, hcl.Diagnostics) {
 	path := lang.ToPath(traversal)
-	for _, addresses := range topo.fileAddrs {
+	for _, addresses := range sorter.fileAddrs {
 		for _, act := range addresses {
 			if path.HasPrefix(act.Path()) {
 				return act, nil
@@ -104,7 +111,7 @@ func (topo topologicalSort) getByPrefix(traversal hcl.Traversal) (action.Address
 		}
 	}
 
-	suggestion := topo.suggest(path)
+	suggestion := sorter.suggest(path)
 	summary := "unknown reference"
 	if suggestion != "" {
 		summary += fmt.Sprintf(`, did you mean "%s"?`, suggestion)
@@ -117,9 +124,9 @@ func (topo topologicalSort) getByPrefix(traversal hcl.Traversal) (action.Address
 	}}
 }
 
-func (topo topologicalSort) ignoreRef(traversal hcl.Traversal) bool {
+func (sorter depthFirst) ignoreRef(traversal hcl.Traversal) bool {
 	traversalPath := lang.ToPath(traversal)
-	for _, path := range topo.global.List() {
+	for _, path := range sorter.global.List() {
 		if traversalPath.HasPrefix(path) {
 			return true
 		}
@@ -128,11 +135,11 @@ func (topo topologicalSort) ignoreRef(traversal hcl.Traversal) bool {
 	return false
 }
 
-func (topo topologicalSort) suggest(search cty.Path) string {
+func (sorter depthFirst) suggest(search cty.Path) string {
 	searchText := lang.PathString(search)
 	suggestion := ""
 	bestDistance := len(searchText)
-	for _, addresses := range topo.fileAddrs {
+	for _, addresses := range sorter.fileAddrs {
 		for _, addr := range addresses {
 			typo := lang.PathString(addr.Path())
 			dist := levenshtein.Distance(searchText, typo, nil)
