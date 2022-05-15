@@ -1,6 +1,6 @@
 locals {
   main = "cmd/main.go"
-  binary = replace(local.main, ".go", "${data.revision.std_out}.bin")
+  binary = replace(local.main, ".go", ".${data.revision.std_out}.bin")
 }
 
 task "main" {
