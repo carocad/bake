@@ -25,10 +25,6 @@ data "revision" {
   command = "git rev-parse --short HEAD"
 }
 
-data "version" {
-  command = "git describe --tags --abbrev=0 || true"
-}
-
 data "branch" {
   command = "git rev-parse --abbrev-ref HEAD | tr A-Z/ a-z-"
 }

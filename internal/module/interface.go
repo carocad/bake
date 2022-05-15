@@ -25,7 +25,7 @@ type Module struct {
 
 func (module Module) Plan(target string, filePartials map[string][]lang.RawAddress) ([]lang.Action, hcl.Diagnostics) {
 	allActions := make([]lang.Action, 0)
-	for filename, addresses := range filePartials {
+	for _, addresses := range filePartials {
 		for _, act := range addresses {
 
 			if lang.PathString(act.Path()) != target {
@@ -38,7 +38,12 @@ func (module Module) Plan(target string, filePartials map[string][]lang.RawAddre
 			}
 
 			for _, dep := range deps {
-				context, diags := module.currentContext(filename, allActions)
+				parent, diags := module.parentContext(dep, filePartials)
+				if diags.HasErrors() {
+					return nil, diags
+				}
+
+				context, diags := module.childContext(parent.NewChild(), allActions)
 				if diags.HasErrors() {
 					return nil, diags
 				}
