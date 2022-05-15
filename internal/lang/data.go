@@ -54,16 +54,17 @@ func (d *Data) Apply() hcl.Diagnostics {
 		String: strings.TrimSpace(stdout.String()),
 		Valid:  true,
 	}
+
+	d.StdErr = values.EventualString{
+		String: strings.TrimSpace(stderr.String()),
+		Valid:  true,
+	}
+
 	// todo: keep a ref to command.ProcessState since it contains useful info
 	// like process time, exit code, etc
 	d.ExitCode = values.EventualInt64{
 		Int64: int64(command.ProcessState.ExitCode()),
 		Valid: true,
-	}
-
-	d.StdErr = values.EventualString{
-		String: stderr.String(),
-		Valid:  true,
 	}
 
 	if err != nil {

@@ -60,6 +60,12 @@ func (t Task) Apply() hcl.Diagnostics {
 		String: strings.TrimSpace(stdout.String()),
 		Valid:  true,
 	}
+
+	t.StdErr = values.EventualString{
+		String: strings.TrimSpace(stderr.String()),
+		Valid:  true,
+	}
+
 	// todo: keep a ref to command.ProcessState since it contains useful info
 	// like process time, exit code, etc
 	t.ExitCode = values.EventualInt64{
@@ -67,10 +73,6 @@ func (t Task) Apply() hcl.Diagnostics {
 		Valid: true,
 	}
 
-	t.StdErr = values.EventualString{
-		String: stderr.String(),
-		Valid:  true,
-	}
 	if err != nil {
 		return hcl.Diagnostics{{
 			Severity: hcl.DiagError,
