@@ -1,27 +1,27 @@
 locals {
   main = "cmd/main.go"
-  binary = replace(local.main, ".go", ".bin")
+  binary = replace(local.main, ".go", "${data.revision.std_out}.bin")
 }
 
-phony "main" {
+task "main" {
   command = "echo 'I did it :)'"
 
   depends_on = [first]
 }
 
-target "first" {
+task "first" {
   filename = local.binary
   command  = "go build -o ${local.binary} ${local.main}"
   sources  = [local.main]
 
-  depends_on = [phony.second]
+  depends_on = [second]
 }
 
-phony "second" {
+task "second" {
   command = "echo 'hello ${path.module}'"
 }
 
-phony "data" {
+data "revision" {
   command = "git rev-parse --short HEAD"
 }
 

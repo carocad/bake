@@ -93,7 +93,7 @@ func (n addressBlock) GetName() string {
 }
 
 func (n addressBlock) Path() cty.Path {
-	if n.label == TargetLabel {
+	if n.label == TaskLabel {
 		return cty.GetAttrPath(n.name)
 	}
 
@@ -116,8 +116,8 @@ func (n addressBlock) Dependencies() ([]hcl.Traversal, hcl.Diagnostics) {
 
 func (n addressBlock) Decode(ctx *hcl.EvalContext) ([]Action, hcl.Diagnostics) {
 	switch n.label {
-	case TargetLabel:
-		target := Target{addressBlock: n}
+	case TaskLabel:
+		target := Task{addressBlock: n}
 		diagnostics := gohcl.DecodeBody(n.body, ctx, &target)
 		if diagnostics.HasErrors() {
 			return nil, diagnostics
@@ -129,19 +129,24 @@ func (n addressBlock) Decode(ctx *hcl.EvalContext) ([]Action, hcl.Diagnostics) {
 		}
 
 		return []Action{target}, nil
-	case PhonyLabel:
-		phony := Phony{addressBlock: n}
-		diagnostics := gohcl.DecodeBody(n.body, ctx, &phony)
+	case DataLabel:
+		data := Data{addressBlock: n}
+		diagnostics := gohcl.DecodeBody(n.body, ctx, &data)
 		if diagnostics.HasErrors() {
 			return nil, diagnostics
 		}
 
-		diagnostics = checkDependsOn(phony.Remain)
+		diagnostics = checkDependsOn(data.Remain)
 		if diagnostics.HasErrors() {
 			return nil, diagnostics
 		}
 
-		return []Action{phony}, nil
+		diagnostics = data.Refresh()
+		if diagnostics.HasErrors() {
+			return nil, diagnostics
+		}
+
+		return []Action{data}, nil
 	default:
 		panic("missing label implementation " + n.label)
 	}

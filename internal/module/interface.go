@@ -7,11 +7,8 @@ import (
 	"github.com/zclconf/go-cty/cty"
 )
 
-const dataName = "data"
-
 var (
-	phonyData   = cty.GetAttrPath(lang.PhonyLabel).GetAttr(dataName)
-	phonyPrefix = cty.GetAttrPath(lang.PhonyLabel)
+	dataPrefix  = cty.GetAttrPath(lang.DataLabel)
 	localPrefix = cty.GetAttrPath(lang.LocalScope)
 	pathPrefix  = cty.GetAttrPath(lang.PathScope)
 	// globalPrefixes are those automatically injected by bake instead of defined by

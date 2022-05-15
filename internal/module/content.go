@@ -42,7 +42,7 @@ func (module Module) currentContext(filename string, actions []lang.Action) (*hc
 		path := act.Path()
 		value := act.CTY()
 		switch {
-		case path.HasPrefix(phonyPrefix):
+		case path.HasPrefix(dataPrefix):
 			phony[name] = value
 		case path.HasPrefix(localPrefix):
 			local[name] = value
@@ -52,7 +52,7 @@ func (module Module) currentContext(filename string, actions []lang.Action) (*hc
 		}
 	}
 
-	variables[lang.PhonyLabel] = cty.ObjectVal(phony)
+	variables[lang.DataLabel] = cty.ObjectVal(phony)
 	variables[lang.LocalScope] = cty.ObjectVal(local)
 	return &hcl.EvalContext{
 		Variables: variables,

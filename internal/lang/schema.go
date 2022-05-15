@@ -7,8 +7,8 @@ import (
 
 // labels
 const (
-	TargetLabel = "target"
-	PhonyLabel  = "phony"
+	TaskLabel   = "task"
+	DataLabel   = "data"
 	LocalsLabel = "locals"
 	NameLabel   = "name"
 )
@@ -34,10 +34,10 @@ func RecipeSchema() *hcl.BodySchema {
 	return &hcl.BodySchema{
 		Attributes: nil,
 		Blocks: []hcl.BlockHeaderSchema{{
-			Type:       TargetLabel,
+			Type:       TaskLabel,
 			LabelNames: []string{NameLabel},
 		}, {
-			Type:       PhonyLabel,
+			Type:       DataLabel,
 			LabelNames: []string{NameLabel},
 		}, {
 			Type:       LocalsLabel,
