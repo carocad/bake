@@ -35,7 +35,7 @@ func (module Module) currentContext(filename string, actions []lang.Action) (*hc
 		}),
 	}
 
-	phony := map[string]cty.Value{}
+	data := map[string]cty.Value{}
 	local := map[string]cty.Value{}
 	for _, act := range actions {
 		name := act.GetName()
@@ -43,7 +43,7 @@ func (module Module) currentContext(filename string, actions []lang.Action) (*hc
 		value := act.CTY()
 		switch {
 		case path.HasPrefix(dataPrefix):
-			phony[name] = value
+			data[name] = value
 		case path.HasPrefix(localPrefix):
 			local[name] = value
 		default:
@@ -52,7 +52,7 @@ func (module Module) currentContext(filename string, actions []lang.Action) (*hc
 		}
 	}
 
-	variables[lang.DataLabel] = cty.ObjectVal(phony)
+	variables[lang.DataLabel] = cty.ObjectVal(data)
 	variables[lang.LocalScope] = cty.ObjectVal(local)
 	return &hcl.EvalContext{
 		Variables: variables,

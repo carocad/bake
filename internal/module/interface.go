@@ -28,11 +28,7 @@ func (module Module) Plan(target string, filePartials map[string][]lang.RawAddre
 	for filename, addresses := range filePartials {
 		for _, act := range addresses {
 
-			if act.Path().HasPrefix(localPrefix) {
-				continue
-			}
-
-			if act.GetName() != target {
+			if lang.PathString(act.Path()) != target {
 				continue
 			}
 

@@ -38,7 +38,7 @@ func (d *Data) Refresh() hcl.Diagnostics {
 		return nil
 	}
 
-	log.Println("executing " + PathString(d.Path()))
+	log.Println("refreshing " + PathString(d.Path()))
 
 	terminal := "bash"
 	shell, ok := os.LookupEnv("SHELL")

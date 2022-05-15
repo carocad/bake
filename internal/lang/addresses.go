@@ -141,6 +141,8 @@ func (n addressBlock) Decode(ctx *hcl.EvalContext) ([]Action, hcl.Diagnostics) {
 			return nil, diagnostics
 		}
 
+		// we need to refresh before the next actions are loaded since
+		// they depend on the data values
 		diagnostics = data.Refresh()
 		if diagnostics.HasErrors() {
 			return nil, diagnostics
