@@ -12,6 +12,8 @@ type Target struct { // todo: what is really optional?
 	Command     string   `hcl:"command,optional"`
 	Creates     string   `hcl:"creates,optional"`
 	Sources     []string `hcl:"sources,optional"`
+	Filename    string   `hcl:"filename,optional"`
+	Remain      hcl.Body `hcl:",remain"`
 }
 
 func (t Target) Apply() hcl.Diagnostics {

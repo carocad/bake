@@ -123,10 +123,20 @@ func (n addressBlock) Decode(ctx *hcl.EvalContext) ([]Action, hcl.Diagnostics) {
 			return nil, diagnostics
 		}
 
+		diagnostics = checkDependsOn(target.Remain)
+		if diagnostics.HasErrors() {
+			return nil, diagnostics
+		}
+
 		return []Action{target}, nil
 	case PhonyLabel:
 		phony := Phony{addressBlock: n}
 		diagnostics := gohcl.DecodeBody(n.body, ctx, &phony)
+		if diagnostics.HasErrors() {
+			return nil, diagnostics
+		}
+
+		diagnostics = checkDependsOn(phony.Remain)
 		if diagnostics.HasErrors() {
 			return nil, diagnostics
 		}

@@ -8,8 +8,9 @@ import (
 
 type Phony struct { // todo: what is really optional?
 	addressBlock
-	Description string `hcl:"description,optional"`
-	Command     string `hcl:"command,optional"`
+	Description string   `hcl:"description,optional"`
+	Command     string   `hcl:"command,optional"`
+	Remain      hcl.Body `hcl:",remain"`
 }
 
 func (p Phony) Apply() hcl.Diagnostics {

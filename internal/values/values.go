@@ -21,6 +21,11 @@ func StructToCty(instance interface{}) cty.Value {
 			continue
 		}
 
+		// ignore custom hcl tags :invader
+		if field.Tag.Get("hcl") == ",remain" {
+			continue
+		}
+
 		fieldInterface := fieldValue.Interface()
 		name := ToSnakeCase(field.Name)
 		if v, ok := fieldInterface.(Cty); ok {
