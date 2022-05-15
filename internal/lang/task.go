@@ -29,7 +29,7 @@ type Task struct { // todo: what is really optional?
 func (t Task) CTY() cty.Value {
 	value := values.StructToCty(t)
 	m := value.AsValueMap()
-	m[NameLabel] = cty.StringVal(t.name)
+	m[NameLabel] = cty.StringVal(t.GetName())
 	return cty.ObjectVal(m)
 }
 

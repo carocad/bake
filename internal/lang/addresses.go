@@ -27,9 +27,7 @@ type RawAddress interface {
 func NewPartialAddress(block *hcl.Block) ([]RawAddress, hcl.Diagnostics) {
 	if block.Type != LocalsLabel {
 		return []RawAddress{addressBlock{
-			name:  block.Labels[0],
-			label: block.Type,
-			body:  block.Body,
+			block: block,
 		}}, nil
 	}
 
@@ -42,7 +40,7 @@ func NewPartialAddress(block *hcl.Block) ([]RawAddress, hcl.Diagnostics) {
 	for name, attribute := range attributes {
 		addrs = append(addrs, addressAttribute{
 			name:  name,
-			label: block.Type,
+			label: LocalScope,
 			expr:  attribute.Expr,
 		})
 	}
@@ -61,7 +59,7 @@ func (a addressAttribute) GetName() string {
 }
 
 func (a addressAttribute) Path() cty.Path {
-	return cty.GetAttrPath(LocalScope).GetAttr(a.name)
+	return cty.GetAttrPath(a.label).GetAttr(a.name)
 }
 
 func (a addressAttribute) Dependencies() ([]hcl.Traversal, hcl.Diagnostics) {
@@ -83,25 +81,23 @@ func (a addressAttribute) Decode(ctx *hcl.EvalContext) ([]Action, hcl.Diagnostic
 }
 
 type addressBlock struct {
-	name  string
-	label string
-	body  hcl.Body
+	block *hcl.Block
 }
 
 func (n addressBlock) GetName() string {
-	return n.name
+	return n.block.Labels[0]
 }
 
 func (n addressBlock) Path() cty.Path {
-	if n.label == TaskLabel {
-		return cty.GetAttrPath(n.name)
+	if n.block.Type == TaskLabel {
+		return cty.GetAttrPath(n.GetName())
 	}
 
-	return cty.GetAttrPath(n.label).GetAttr(n.name)
+	return cty.GetAttrPath(n.block.Type).GetAttr(n.GetName())
 }
 
 func (n addressBlock) Dependencies() ([]hcl.Traversal, hcl.Diagnostics) {
-	attributes, diagnostics := n.body.JustAttributes()
+	attributes, diagnostics := n.block.Body.JustAttributes()
 	if diagnostics.HasErrors() {
 		return nil, diagnostics
 	}
@@ -115,10 +111,10 @@ func (n addressBlock) Dependencies() ([]hcl.Traversal, hcl.Diagnostics) {
 }
 
 func (n addressBlock) Decode(ctx *hcl.EvalContext) ([]Action, hcl.Diagnostics) {
-	switch n.label {
+	switch n.block.Type {
 	case TaskLabel:
 		target := Task{addressBlock: n}
-		diagnostics := gohcl.DecodeBody(n.body, ctx, &target)
+		diagnostics := gohcl.DecodeBody(n.block.Body, ctx, &target)
 		if diagnostics.HasErrors() {
 			return nil, diagnostics
 		}
@@ -131,18 +127,13 @@ func (n addressBlock) Decode(ctx *hcl.EvalContext) ([]Action, hcl.Diagnostics) {
 		return []Action{&target}, nil
 	case DataLabel:
 		data := Data{addressBlock: n}
-		diagnostics := gohcl.DecodeBody(n.body, ctx, &data)
-		if diagnostics.HasErrors() {
-			return nil, diagnostics
-		}
-
-		diagnostics = checkDependsOn(data.Remain)
+		diagnostics := gohcl.DecodeBody(n.block.Body, ctx, &data)
 		if diagnostics.HasErrors() {
 			return nil, diagnostics
 		}
 
 		return []Action{&data}, nil
 	default:
-		panic("missing label implementation " + n.label)
+		panic("missing label implementation " + n.block.Type)
 	}
 }

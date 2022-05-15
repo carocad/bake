@@ -4,7 +4,7 @@ locals {
 }
 
 task "main" {
-  command = "echo 'I did it :)'"
+  command = "echo 'I did it :) ${data.version.std_out}'"
 
   depends_on = [first]
 }
@@ -18,11 +18,19 @@ task "first" {
 }
 
 task "second" {
-  command = "echo 'hello ${path.module}'"
+  command = "echo 'hello ${path.module}, I am in ${data.branch.std_out}'"
 }
 
 data "revision" {
   command = "git rev-parse --short HEAD"
+}
+
+data "version" {
+  command = "git describe --tags --abbrev=0"
+}
+
+data "branch" {
+  command = "git rev-parse --abbrev-ref HEAD | tr A-Z/ a-z-"
 }
 
 // todo: enable for_each

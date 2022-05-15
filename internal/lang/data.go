@@ -14,18 +14,17 @@ import (
 
 type Data struct {
 	addressBlock
-	Description string   `hcl:"description,optional"`
-	Command     string   `hcl:"command,optional"`
-	Remain      hcl.Body `hcl:",remain"`
+	Description string `hcl:"description,optional"`
+	Command     string `hcl:"command,optional"`
 	StdOut      values.EventualString
 	StdErr      values.EventualString
 	ExitCode    values.EventualInt64
 }
 
-func (p Data) CTY() cty.Value {
-	value := values.StructToCty(p)
+func (d Data) CTY() cty.Value {
+	value := values.StructToCty(d)
 	m := value.AsValueMap()
-	m[NameLabel] = cty.StringVal(p.name)
+	m[NameLabel] = cty.StringVal(d.GetName())
 	return cty.ObjectVal(m)
 }
 
@@ -59,17 +58,18 @@ func (d *Data) Apply() hcl.Diagnostics {
 		Valid: true,
 	}
 
-	if err != nil {
-		if ee, ok := err.(*exec.ExitError); ok {
-			d.StdErr = values.EventualString{
-				String: strings.TrimSpace(string(ee.Stderr)),
-				Valid:  true,
-			}
+	if ee, ok := err.(*exec.ExitError); ok {
+		d.StdErr = values.EventualString{
+			String: strings.TrimSpace(string(ee.Stderr)),
+			Valid:  true,
 		}
 
 		return hcl.Diagnostics{{
 			Severity: hcl.DiagError,
-			Summary:  fmt.Sprintf("%s failed with %s", d.Command, err.Error()),
+			Summary:  fmt.Sprintf(`"%s" command failed with exit code %d`, PathString(d.Path()), d.ExitCode.Int64),
+			Detail:   d.StdErr.String,
+			Subject:  getCommandRange(d.block),
+			Context:  d.block.DefRange.Ptr(),
 		}}
 	}
 

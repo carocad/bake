@@ -23,6 +23,7 @@ const (
 // attributes
 const (
 	DependsOnAttr = "depends_on"
+	CommandAttr   = "command"
 	ForEachAttr   = "for_each" // todo
 )
 
