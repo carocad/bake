@@ -45,12 +45,23 @@ func (module Module) Plan(target string, filePartials map[string][]lang.RawAddre
 
 				// data blocks perform effects here as
 				// locals might depend on data
-				addrs, diagnostics := dep.Decode(context)
+				actions, diagnostics := dep.Decode(context)
 				if diagnostics.HasErrors() {
 					return nil, diagnostics
 				}
 
-				allActions = append(allActions, addrs...)
+				// we need to refresh before the next actions are loaded since
+				// they depend on the data values
+				for _, action := range actions {
+					if action.Path().HasPrefix(dataPrefix) {
+						diagnostics = action.Apply()
+						if diagnostics.HasErrors() {
+							return nil, diagnostics
+						}
+					}
+				}
+
+				allActions = append(allActions, actions...)
 			}
 
 			return allActions, nil

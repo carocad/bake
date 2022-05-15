@@ -22,10 +22,6 @@ type Data struct {
 	ExitCode    values.EventualInt64
 }
 
-func (p Data) Apply() hcl.Diagnostics {
-	return nil
-}
-
 func (p Data) CTY() cty.Value {
 	value := values.StructToCty(p)
 	m := value.AsValueMap()
@@ -33,7 +29,7 @@ func (p Data) CTY() cty.Value {
 	return cty.ObjectVal(m)
 }
 
-func (d *Data) Refresh() hcl.Diagnostics {
+func (d *Data) Apply() hcl.Diagnostics {
 	if d.ExitCode.Valid {
 		return nil
 	}

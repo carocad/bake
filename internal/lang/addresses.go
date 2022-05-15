@@ -128,7 +128,7 @@ func (n addressBlock) Decode(ctx *hcl.EvalContext) ([]Action, hcl.Diagnostics) {
 			return nil, diagnostics
 		}
 
-		return []Action{target}, nil
+		return []Action{&target}, nil
 	case DataLabel:
 		data := Data{addressBlock: n}
 		diagnostics := gohcl.DecodeBody(n.body, ctx, &data)
@@ -141,14 +141,7 @@ func (n addressBlock) Decode(ctx *hcl.EvalContext) ([]Action, hcl.Diagnostics) {
 			return nil, diagnostics
 		}
 
-		// we need to refresh before the next actions are loaded since
-		// they depend on the data values
-		diagnostics = data.Refresh()
-		if diagnostics.HasErrors() {
-			return nil, diagnostics
-		}
-
-		return []Action{data}, nil
+		return []Action{&data}, nil
 	default:
 		panic("missing label implementation " + n.label)
 	}
