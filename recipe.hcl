@@ -26,7 +26,7 @@ data "revision" {
 }
 
 data "version" {
-  command = "git describe --tags --abbrev=0"
+  command = "git describe --tags --abbrev=0 || true"
 }
 
 data "branch" {

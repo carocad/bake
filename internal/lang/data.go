@@ -1,6 +1,7 @@
 package lang
 
 import (
+	"bytes"
 	"fmt"
 	"log"
 	"os"
@@ -14,11 +15,10 @@ import (
 
 type Data struct {
 	addressBlock
-	Description string `hcl:"description,optional"`
-	Command     string `hcl:"command,optional"`
-	StdOut      values.EventualString
-	StdErr      values.EventualString
-	ExitCode    values.EventualInt64
+	Command  string `hcl:"command,optional"`
+	StdOut   values.EventualString
+	StdErr   values.EventualString
+	ExitCode values.EventualInt64
 }
 
 func (d Data) CTY() cty.Value {
@@ -46,9 +46,12 @@ func (d *Data) Apply() hcl.Diagnostics {
 
 	%s`, d.Command)
 	command := exec.Command(terminal, "-c", script)
-	output, err := command.Output()
+	var stdout, stderr bytes.Buffer
+	command.Stdout = &stdout
+	command.Stderr = &stderr
+	err := command.Run()
 	d.StdOut = values.EventualString{
-		String: strings.TrimSpace(string(output)),
+		String: strings.TrimSpace(stdout.String()),
 		Valid:  true,
 	}
 	// todo: keep a ref to command.ProcessState since it contains useful info
@@ -58,12 +61,12 @@ func (d *Data) Apply() hcl.Diagnostics {
 		Valid: true,
 	}
 
-	if ee, ok := err.(*exec.ExitError); ok {
-		d.StdErr = values.EventualString{
-			String: strings.TrimSpace(string(ee.Stderr)),
-			Valid:  true,
-		}
+	d.StdErr = values.EventualString{
+		String: stderr.String(),
+		Valid:  true,
+	}
 
+	if err != nil {
 		return hcl.Diagnostics{{
 			Severity: hcl.DiagError,
 			Summary:  fmt.Sprintf(`"%s" command failed with exit code %d`, PathString(d.Path()), d.ExitCode.Int64),
@@ -73,6 +76,5 @@ func (d *Data) Apply() hcl.Diagnostics {
 		}}
 	}
 
-	// log.Println(command.String(), *task.ExitCode, *task.StdOut, task.StdErr)
 	return nil
 }

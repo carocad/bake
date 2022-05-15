@@ -1,6 +1,7 @@
 package lang
 
 import (
+	"bytes"
 	"fmt"
 	"log"
 	"os"
@@ -51,9 +52,12 @@ func (t Task) Apply() hcl.Diagnostics {
 
 	%s`, t.Command)
 	command := exec.Command(terminal, "-c", script)
-	output, err := command.Output()
+	var stdout, stderr bytes.Buffer
+	command.Stdout = &stdout
+	command.Stderr = &stderr
+	err := command.Run()
 	t.StdOut = values.EventualString{
-		String: strings.TrimSpace(string(output)),
+		String: strings.TrimSpace(stdout.String()),
 		Valid:  true,
 	}
 	// todo: keep a ref to command.ProcessState since it contains useful info
@@ -63,20 +67,19 @@ func (t Task) Apply() hcl.Diagnostics {
 		Valid: true,
 	}
 
+	t.StdErr = values.EventualString{
+		String: stderr.String(),
+		Valid:  true,
+	}
 	if err != nil {
-		if ee, ok := err.(*exec.ExitError); ok {
-			t.StdErr = values.EventualString{
-				String: strings.TrimSpace(string(ee.Stderr)),
-				Valid:  true,
-			}
-		}
-
 		return hcl.Diagnostics{{
 			Severity: hcl.DiagError,
-			Summary:  fmt.Sprintf("%s failed with %s", t.Command, err.Error()),
+			Summary:  fmt.Sprintf(`"%s" command failed with exit code %d`, PathString(t.Path()), t.ExitCode.Int64),
+			Detail:   t.StdErr.String,
+			Subject:  getCommandRange(t.block),
+			Context:  t.block.DefRange.Ptr(),
 		}}
 	}
 
-	// log.Println(command.String(), *task.ExitCode, *task.StdOut, task.StdErr)
 	return nil
 }
