@@ -95,7 +95,7 @@ func (state System) Apply(action string) hcl.Diagnostics {
 	}
 
 	for _, act := range actions {
-		_, diags = act.Apply()
+		diags = act.Apply()
 		if diags.HasErrors() {
 			return diags
 		}

@@ -64,9 +64,9 @@ func (module Module) childContext(child *hcl.EvalContext, actions []lang.Action)
 		path := act.Path()
 		value := act.CTY()
 		switch {
-		case path.HasPrefix(dataPrefix):
+		case path.HasPrefix(lang.DataPrefix):
 			data[name] = value
-		case path.HasPrefix(localPrefix):
+		case path.HasPrefix(lang.LocalPrefix):
 			local[name] = value
 		default:
 			// only targets for now !!

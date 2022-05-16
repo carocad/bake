@@ -15,7 +15,7 @@ type Address interface {
 type Action interface {
 	Address
 	values.Cty
-	Apply() (Action, hcl.Diagnostics)
+	Apply() hcl.Diagnostics
 }
 
 type RawAddress interface {

@@ -6,7 +6,6 @@ import (
 	"log"
 	"os"
 	"os/exec"
-	"strings"
 
 	"bake/internal/values"
 	"github.com/hashicorp/hcl/v2"
@@ -21,10 +20,7 @@ type Task struct { // todo: what is really optional?
 	Sources     []string `hcl:"sources,optional"`
 	Filename    string   `hcl:"filename,optional"`
 	Remain      hcl.Body `hcl:",remain"`
-	// todo: I dont actually need this since only data exposes it
-	StdOut   values.EventualString
-	StdErr   values.EventualString
-	ExitCode values.EventualInt64
+	exitCode    values.EventualInt64
 }
 
 func (t Task) CTY() cty.Value {
@@ -34,9 +30,9 @@ func (t Task) CTY() cty.Value {
 	return cty.ObjectVal(m)
 }
 
-func (t Task) Apply() (Action, hcl.Diagnostics) {
-	if t.ExitCode.Valid {
-		return t, nil
+func (t *Task) Apply() hcl.Diagnostics {
+	if t.exitCode.Valid {
+		return nil
 	}
 
 	log.Println("executing " + PathString(t.Path()))
@@ -56,32 +52,22 @@ func (t Task) Apply() (Action, hcl.Diagnostics) {
 	command.Stdout = &stdout
 	command.Stderr = &stderr
 	err := command.Run()
-	t.StdOut = values.EventualString{
-		String: strings.TrimSpace(stdout.String()),
-		Valid:  true,
-	}
-
-	t.StdErr = values.EventualString{
-		String: strings.TrimSpace(stderr.String()),
-		Valid:  true,
-	}
-
 	// todo: keep a ref to command.ProcessState since it contains useful info
 	// like process time, exit code, etc
-	t.ExitCode = values.EventualInt64{
+	t.exitCode = values.EventualInt64{
 		Int64: int64(command.ProcessState.ExitCode()),
 		Valid: true,
 	}
 
 	if err != nil {
-		return t, hcl.Diagnostics{{
+		return hcl.Diagnostics{{
 			Severity: hcl.DiagError,
-			Summary:  fmt.Sprintf(`"%s" command failed with exit code %d`, PathString(t.Path()), t.ExitCode.Int64),
-			Detail:   t.StdErr.String,
+			Summary:  fmt.Sprintf(`"%s" command failed with exit code %d`, PathString(t.Path()), t.exitCode.Int64),
+			Detail:   stderr.String(),
 			Subject:  getCommandRange(t.block),
 			Context:  t.block.DefRange.Ptr(),
 		}}
 	}
 
-	return t, nil
+	return nil
 }

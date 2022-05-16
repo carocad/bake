@@ -2,18 +2,11 @@ package module
 
 import (
 	"bake/internal/lang"
+	"bake/internal/module/contextualize"
+	"bake/internal/module/worker"
 	"bake/internal/topo"
 	"github.com/hashicorp/hcl/v2"
 	"github.com/zclconf/go-cty/cty"
-)
-
-var (
-	dataPrefix  = cty.GetAttrPath(lang.DataLabel)
-	localPrefix = cty.GetAttrPath(lang.LocalScope)
-	pathPrefix  = cty.GetAttrPath(lang.PathScope)
-	// globalPrefixes are those automatically injected by bake instead of defined by
-	// user input
-	globalPrefixes = cty.NewPathSet(pathPrefix)
 )
 
 type Module struct {
@@ -24,7 +17,6 @@ type Module struct {
 }
 
 func (module Module) Plan(target string, filePartials map[string][]lang.RawAddress) ([]lang.Action, hcl.Diagnostics) {
-	allActions := make([]lang.Action, 0)
 	for _, addresses := range filePartials {
 		for _, act := range addresses {
 
@@ -32,45 +24,18 @@ func (module Module) Plan(target string, filePartials map[string][]lang.RawAddre
 				continue
 			}
 
-			deps, diags := topo.Dependencies(act, filePartials, globalPrefixes)
+			deps, diags := topo.Dependencies(act, filePartials, lang.GlobalPrefixes)
 			if diags.HasErrors() {
 				return nil, diags
 			}
 
-			for _, dep := range deps {
-				parent, diags := module.parentContext(dep, filePartials)
-				if diags.HasErrors() {
-					return nil, diags
-				}
-
-				context, diags := module.childContext(parent.NewChild(), allActions)
-				if diags.HasErrors() {
-					return nil, diags
-				}
-
-				actions, diagnostics := dep.Decode(context)
-				if diagnostics.HasErrors() {
-					return nil, diagnostics
-				}
-
-				// we need to refresh before the next actions are loaded since
-				// they depend on the data values
-				for _, action := range actions {
-					if action.Path().HasPrefix(dataPrefix) {
-						refreshed, diagnostics := action.Apply()
-						if diagnostics.HasErrors() {
-							return nil, diagnostics
-						}
-
-						allActions = append(allActions, refreshed)
-						continue
-					}
-
-					allActions = append(allActions, action)
-				}
+			semaphore := contextualize.NewSemaphore(module.cwd, filePartials)
+			actions, diagnostics := worker.DO(semaphore, deps)
+			if diagnostics.HasErrors() {
+				return nil, diagnostics
 			}
 
-			return allActions, nil
+			return actions, nil
 		}
 	}
 

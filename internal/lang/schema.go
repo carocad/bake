@@ -27,6 +27,15 @@ const (
 	ForEachAttr   = "for_each" // todo
 )
 
+var (
+	DataPrefix  = cty.GetAttrPath(DataLabel)
+	LocalPrefix = cty.GetAttrPath(LocalScope)
+	PathPrefix  = cty.GetAttrPath(PathScope)
+	// GlobalPrefixes are those automatically injected by bake instead of defined by
+	// user input
+	GlobalPrefixes = cty.NewPathSet(PathPrefix)
+)
+
 func RecipeSchema() *hcl.BodySchema {
 	return &hcl.BodySchema{
 		Attributes: nil,
@@ -48,8 +57,8 @@ type Local struct {
 	value cty.Value
 }
 
-func (l Local) Apply() (Action, hcl.Diagnostics) {
-	return l, nil
+func (l Local) Apply() hcl.Diagnostics {
+	return nil
 }
 
 func (l Local) CTY() cty.Value {
