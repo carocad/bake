@@ -38,7 +38,12 @@ func (module Module) Plan(target string, filePartials map[string][]lang.RawAddre
 			}
 
 			for _, dep := range deps {
-				context, diags := module.context(dep, filePartials, allActions)
+				parent, diags := module.parentContext(dep, filePartials)
+				if diags.HasErrors() {
+					return nil, diags
+				}
+
+				context, diags := module.childContext(parent.NewChild(), allActions)
 				if diags.HasErrors() {
 					return nil, diags
 				}
