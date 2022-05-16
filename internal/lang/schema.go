@@ -48,8 +48,8 @@ type Local struct {
 	value cty.Value
 }
 
-func (l Local) Apply() hcl.Diagnostics {
-	return nil
+func (l Local) Apply() (Action, hcl.Diagnostics) {
+	return l, nil
 }
 
 func (l Local) CTY() cty.Value {

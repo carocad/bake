@@ -28,9 +28,9 @@ func (d Data) CTY() cty.Value {
 	return cty.ObjectVal(m)
 }
 
-func (d *Data) Apply() hcl.Diagnostics {
+func (d Data) Apply() (Action, hcl.Diagnostics) {
 	if d.ExitCode.Valid {
-		return nil
+		return d, nil
 	}
 
 	log.Println("refreshing " + PathString(d.Path()))
@@ -68,7 +68,7 @@ func (d *Data) Apply() hcl.Diagnostics {
 	}
 
 	if err != nil {
-		return hcl.Diagnostics{{
+		return d, hcl.Diagnostics{{
 			Severity: hcl.DiagError,
 			Summary:  fmt.Sprintf(`"%s" command failed with exit code %d`, PathString(d.Path()), d.ExitCode.Int64),
 			Detail:   d.StdErr.String,
@@ -77,5 +77,5 @@ func (d *Data) Apply() hcl.Diagnostics {
 		}}
 	}
 
-	return nil
+	return d, nil
 }

@@ -34,9 +34,9 @@ func (t Task) CTY() cty.Value {
 	return cty.ObjectVal(m)
 }
 
-func (t Task) Apply() hcl.Diagnostics {
+func (t Task) Apply() (Action, hcl.Diagnostics) {
 	if t.ExitCode.Valid {
-		return nil
+		return t, nil
 	}
 
 	log.Println("executing " + PathString(t.Path()))
@@ -74,7 +74,7 @@ func (t Task) Apply() hcl.Diagnostics {
 	}
 
 	if err != nil {
-		return hcl.Diagnostics{{
+		return t, hcl.Diagnostics{{
 			Severity: hcl.DiagError,
 			Summary:  fmt.Sprintf(`"%s" command failed with exit code %d`, PathString(t.Path()), t.ExitCode.Int64),
 			Detail:   t.StdErr.String,
@@ -83,5 +83,5 @@ func (t Task) Apply() hcl.Diagnostics {
 		}}
 	}
 
-	return nil
+	return t, nil
 }
