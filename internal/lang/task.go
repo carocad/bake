@@ -6,6 +6,7 @@ import (
 	"log"
 	"os"
 	"os/exec"
+	"strings"
 
 	"bake/internal/values"
 	"github.com/hashicorp/hcl/v2"
@@ -59,11 +60,16 @@ func (t *Task) Apply() hcl.Diagnostics {
 		Valid: true,
 	}
 
+	detail := strings.TrimSpace(stderr.String())
+	if detail == "" {
+		detail = strings.TrimSpace(stdout.String())
+	}
+
 	if err != nil {
 		return hcl.Diagnostics{{
 			Severity: hcl.DiagError,
-			Summary:  fmt.Sprintf(`"%s" command failed with exit code %d`, PathString(t.Path()), t.exitCode.Int64),
-			Detail:   stderr.String(),
+			Summary:  fmt.Sprintf(`"%s" task failed with exit code %d`, PathString(t.Path()), t.exitCode.Int64),
+			Detail:   detail,
 			Subject:  getCommandRange(t.block),
 			Context:  t.block.DefRange.Ptr(),
 		}}

@@ -67,11 +67,16 @@ func (d *Data) Apply() hcl.Diagnostics {
 		Valid: true,
 	}
 
+	detail := d.StdErr.String
+	if detail == "" {
+		detail = d.StdOut.String
+	}
+
 	if err != nil {
 		return hcl.Diagnostics{{
 			Severity: hcl.DiagError,
 			Summary:  fmt.Sprintf(`"%s" command failed with exit code %d`, PathString(d.Path()), d.ExitCode.Int64),
-			Detail:   d.StdErr.String,
+			Detail:   detail,
 			Subject:  getCommandRange(d.block),
 			Context:  d.block.DefRange.Ptr(),
 		}}

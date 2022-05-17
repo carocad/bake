@@ -1,4 +1,4 @@
-package routine
+package concurrent
 
 import (
 	"context"
@@ -18,9 +18,9 @@ type Coordinator struct {
 	waiting map[string]*sync.WaitGroup // lazily initialized
 }
 
-func WithContext(ctx context.Context) Coordinator {
+func NewCoordinator(ctx context.Context, parallelism int) Coordinator {
 	group, ctx2 := errgroup.WithContext(ctx)
-	group.SetLimit(DefaultParallelism)
+	group.SetLimit(parallelism)
 	return Coordinator{
 		pool:    group,
 		ctx:     ctx2,

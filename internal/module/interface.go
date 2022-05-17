@@ -2,10 +2,9 @@ package module
 
 import (
 	"context"
-	"sync"
 
+	"bake/internal/concurrent"
 	"bake/internal/lang"
-	"bake/internal/routine"
 	"bake/internal/topo"
 	"github.com/hashicorp/hcl/v2"
 	"github.com/zclconf/go-cty/cty"
@@ -31,28 +30,25 @@ func (module Module) Plan(target string, filePartials map[string][]lang.RawAddre
 				return nil, diags
 			}
 
-			actGroup := make([][]lang.Action, len(deps))
-			coordinator := routine.WithContext(context.TODO())
-			mutex := sync.RWMutex{}
-			for index, dep := range deps {
-				index, dep := index, dep
+			result := concurrent.NewSlice[lang.Action]()
+			coordinator := concurrent.NewCoordinator(context.TODO(), concurrent.DefaultParallelism)
+			for _, dep := range deps {
 				requires, diags := topo.Dependencies(dep, filePartials, lang.GlobalPrefixes)
 				if diags.HasErrors() {
 					return nil, diags
 				}
 
 				ids := lang.DependencyIds(requires[:len(requires)-1])
+				dep := dep // // https://golang.org/doc/faq#closures_and_goroutines
 				coordinator.Do(lang.PathString(dep.Path()), ids, func() error {
-					eval := module.Context(dep, filePartials, actGroup)
+					eval := module.Context(dep, filePartials, result.Items())
 					actions, diags := dep.Decode(eval)
 					if diags.HasErrors() {
 						return diags
 					}
 
 					if !dep.Path().HasPrefix(lang.DataPrefix) {
-						mutex.Lock()
-						defer mutex.Unlock()
-						actGroup[index] = actions
+						result.Extend(actions)
 						return nil
 					}
 
@@ -65,9 +61,7 @@ func (module Module) Plan(target string, filePartials map[string][]lang.RawAddre
 						}
 					}
 
-					mutex.Lock()
-					defer mutex.Unlock()
-					actGroup[index] = actions
+					result.Extend(actions)
 					return nil
 				})
 			}
@@ -77,17 +71,10 @@ func (module Module) Plan(target string, filePartials map[string][]lang.RawAddre
 			}
 
 			if err != nil {
-				return nil, hcl.Diagnostics{{
-					Severity: hcl.DiagError,
-					Summary:  err.Error(),
-				}}
+				panic(err)
 			}
 
-			result := make([]lang.Action, 0)
-			for _, actions := range actGroup {
-				result = append(result, actions...)
-			}
-			return result, nil
+			return result.Items(), nil
 		}
 	}
 

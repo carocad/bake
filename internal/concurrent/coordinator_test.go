@@ -1,4 +1,4 @@
-package routine
+package concurrent
 
 import (
 	"context"
@@ -12,7 +12,7 @@ const tolerance = 0.1
 
 func TestSerialCoordination(t *testing.T) {
 	data := []string{"1", "2", "3", "4", "5"}
-	coordinator := WithContext(context.TODO())
+	coordinator := NewCoordinator(context.TODO(), DefaultParallelism)
 	result := make([][]string, len(data))
 	start := time.Now()
 	for index, v := range data {
@@ -47,7 +47,7 @@ func TestSerialCoordination(t *testing.T) {
 
 func TestParallelCoordination(t *testing.T) {
 	data := []string{"1", "2", "3", "4", "5"}
-	coordinator := WithContext(context.TODO())
+	coordinator := NewCoordinator(context.TODO(), DefaultParallelism)
 	start := time.Now()
 	for _, v := range data {
 		coordinator.Do(v, nil, func() error {
@@ -77,7 +77,7 @@ func TestCustomCoordination(t *testing.T) {
 		"4": {"3", "2"}, // duration = 0.2 + 0.4 = 0.6
 		"5": {"4"},      // duration = 0.2 + 0.6 = 0.8
 	}
-	coordinator := WithContext(context.TODO())
+	coordinator := NewCoordinator(context.TODO(), DefaultParallelism)
 	result := make([][]string, len(data))
 	start := time.Now()
 	index := 0

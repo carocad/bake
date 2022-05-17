@@ -26,7 +26,7 @@ func (module *Module) GetContent(file *hcl.File) ([]lang.RawAddress, hcl.Diagnos
 	return addrs, nil
 }
 
-func (module Module) Context(addr lang.RawAddress, fileAddrs map[string][]lang.RawAddress, actions [][]lang.Action) *hcl.EvalContext {
+func (module Module) Context(addr lang.RawAddress, fileAddrs map[string][]lang.RawAddress, actions []lang.Action) *hcl.EvalContext {
 	addrFile := ""
 	for filename, addresses := range fileAddrs {
 		for _, address := range addresses {
@@ -51,20 +51,18 @@ func (module Module) Context(addr lang.RawAddress, fileAddrs map[string][]lang.R
 
 	data := map[string]cty.Value{}
 	local := map[string]cty.Value{}
-	for _, acts := range actions {
-		for _, act := range acts {
-			name := act.GetName()
-			path := act.Path()
-			value := act.CTY()
-			switch {
-			case path.HasPrefix(lang.DataPrefix):
-				data[name] = value
-			case path.HasPrefix(lang.LocalPrefix):
-				local[name] = value
-			default:
-				// only targets for now !!
-				variables[name] = value
-			}
+	for _, act := range actions {
+		name := act.GetName()
+		path := act.Path()
+		value := act.CTY()
+		switch {
+		case path.HasPrefix(lang.DataPrefix):
+			data[name] = value
+		case path.HasPrefix(lang.LocalPrefix):
+			local[name] = value
+		default:
+			// only targets for now !!
+			variables[name] = value
 		}
 	}
 
