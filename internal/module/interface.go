@@ -1,9 +1,11 @@
 package module
 
 import (
+	"context"
+	"sync"
+
 	"bake/internal/lang"
-	"bake/internal/module/contextualize"
-	"bake/internal/module/worker"
+	"bake/internal/routine"
 	"bake/internal/topo"
 	"github.com/hashicorp/hcl/v2"
 	"github.com/zclconf/go-cty/cty"
@@ -29,13 +31,63 @@ func (module Module) Plan(target string, filePartials map[string][]lang.RawAddre
 				return nil, diags
 			}
 
-			semaphore := contextualize.NewSemaphore(module.cwd, filePartials)
-			actions, diagnostics := worker.DO(semaphore, deps)
-			if diagnostics.HasErrors() {
-				return nil, diagnostics
+			actGroup := make([][]lang.Action, len(deps))
+			coordinator := routine.WithContext(context.TODO())
+			mutex := sync.RWMutex{}
+			for index, dep := range deps {
+				index, dep := index, dep
+				requires, diags := topo.Dependencies(dep, filePartials, lang.GlobalPrefixes)
+				if diags.HasErrors() {
+					return nil, diags
+				}
+
+				ids := lang.DepedencyIds(requires[:len(requires)-1])
+				coordinator.Do(lang.PathString(dep.Path()), ids, func() error {
+					eval := module.Context(dep, filePartials, actGroup)
+					actions, diags := dep.Decode(eval)
+					if diags.HasErrors() {
+						return diags
+					}
+
+					if !dep.Path().HasPrefix(lang.DataPrefix) {
+						mutex.Lock()
+						defer mutex.Unlock()
+						actGroup[index] = actions
+						return nil
+					}
+
+					// we need to refresh before the next actions are loaded since
+					// they depend on the data values
+					for _, action := range actions {
+						diags := action.Apply()
+						if diags.HasErrors() {
+							return diags
+						}
+					}
+
+					mutex.Lock()
+					defer mutex.Unlock()
+					actGroup[index] = actions
+					return nil
+				})
+			}
+			err := coordinator.Wait()
+			if diags, ok := err.(hcl.Diagnostics); ok {
+				return nil, diags
 			}
 
-			return actions, nil
+			if err != nil {
+				return nil, hcl.Diagnostics{{
+					Severity: hcl.DiagError,
+					Summary:  err.Error(),
+				}}
+			}
+
+			result := make([]lang.Action, 0)
+			for _, actions := range actGroup {
+				result = append(result, actions...)
+			}
+			return result, nil
 		}
 	}
 

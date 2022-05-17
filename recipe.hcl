@@ -6,19 +6,23 @@ locals {
 task "main" {
   command = "echo 'I did it :) ${data.version.std_out}'"
 
-  depends_on = [first]
+  depends_on = [compile]
 }
 
-task "first" {
+task "compile" {
   filename = local.binary
   command  = "go build -o ${local.binary} ${local.main}"
   sources  = [local.main]
 
-  depends_on = [second]
+  depends_on = [vet, test]
 }
 
-task "second" {
-  command = "echo 'hello ${path.module}, I am in ${data.branch.std_out}'"
+task "vet" {
+  command = "go vet ./..."
+}
+
+task "test" {
+  command = "go test ./..."
 }
 
 data "revision" {

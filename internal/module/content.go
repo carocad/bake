@@ -26,9 +26,9 @@ func (module *Module) GetContent(file *hcl.File) ([]lang.RawAddress, hcl.Diagnos
 	return addrs, nil
 }
 
-func (module Module) parentContext(addr lang.RawAddress, filePartials map[string][]lang.RawAddress) (*hcl.EvalContext, hcl.Diagnostics) {
+func (module Module) Context(addr lang.RawAddress, fileAddrs map[string][]lang.RawAddress, actions [][]lang.Action) *hcl.EvalContext {
 	addrFile := ""
-	for filename, addresses := range filePartials {
+	for filename, addresses := range fileAddrs {
 		for _, address := range addresses {
 			if address.Path().Equals(addr.Path()) {
 				addrFile = filename
@@ -49,32 +49,29 @@ func (module Module) parentContext(addr lang.RawAddress, filePartials map[string
 		}),
 	}
 
-	return &hcl.EvalContext{
-		Variables: variables,
-		Functions: lang.Functions(),
-	}, nil
-}
-
-func (module Module) childContext(child *hcl.EvalContext, actions []lang.Action) (*hcl.EvalContext, hcl.Diagnostics) {
-	child.Variables = map[string]cty.Value{}
 	data := map[string]cty.Value{}
 	local := map[string]cty.Value{}
-	for _, act := range actions {
-		name := act.GetName()
-		path := act.Path()
-		value := act.CTY()
-		switch {
-		case path.HasPrefix(lang.DataPrefix):
-			data[name] = value
-		case path.HasPrefix(lang.LocalPrefix):
-			local[name] = value
-		default:
-			// only targets for now !!
-			child.Variables[name] = value
+	for _, acts := range actions {
+		for _, act := range acts {
+			name := act.GetName()
+			path := act.Path()
+			value := act.CTY()
+			switch {
+			case path.HasPrefix(lang.DataPrefix):
+				data[name] = value
+			case path.HasPrefix(lang.LocalPrefix):
+				local[name] = value
+			default:
+				// only targets for now !!
+				variables[name] = value
+			}
 		}
 	}
 
-	child.Variables[lang.DataLabel] = cty.ObjectVal(data)
-	child.Variables[lang.LocalScope] = cty.ObjectVal(local)
-	return child, nil
+	variables[lang.DataLabel] = cty.ObjectVal(data)
+	variables[lang.LocalScope] = cty.ObjectVal(local)
+	return &hcl.EvalContext{
+		Variables: variables,
+		Functions: lang.Functions(),
+	}
 }
