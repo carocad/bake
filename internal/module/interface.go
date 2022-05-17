@@ -41,7 +41,7 @@ func (module Module) Plan(target string, filePartials map[string][]lang.RawAddre
 					return nil, diags
 				}
 
-				ids := lang.DepedencyIds(requires[:len(requires)-1])
+				ids := lang.DependencyIds(requires[:len(requires)-1])
 				coordinator.Do(lang.PathString(dep.Path()), ids, func() error {
 					eval := module.Context(dep, filePartials, actGroup)
 					actions, diags := dep.Decode(eval)

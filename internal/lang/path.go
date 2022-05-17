@@ -51,7 +51,7 @@ func PathString(path cty.Path) string {
 	return result
 }
 
-func DepedencyIds(deps []RawAddress) []string {
+func DependencyIds(deps []RawAddress) []string {
 	result := make([]string, 0)
 	for _, dep := range deps {
 		result = append(result, PathString(dep.Path()))
