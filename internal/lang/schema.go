@@ -51,16 +51,3 @@ func RecipeSchema() *hcl.BodySchema {
 		}},
 	}
 }
-
-type Local struct {
-	addressAttribute
-	value cty.Value
-}
-
-func (l Local) Apply() hcl.Diagnostics {
-	return nil
-}
-
-func (l Local) CTY() cty.Value {
-	return l.value
-}

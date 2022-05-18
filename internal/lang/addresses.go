@@ -11,6 +11,7 @@ type Address interface {
 	GetName() string
 	GetPath() cty.Path
 	GetFilename() string
+	Dependencies() ([]hcl.Traversal, hcl.Diagnostics)
 }
 
 type Action interface {
@@ -21,7 +22,6 @@ type Action interface {
 
 type RawAddress interface {
 	Address
-	Dependencies() ([]hcl.Traversal, hcl.Diagnostics)
 	Decode(ctx *hcl.EvalContext) ([]Action, hcl.Diagnostics)
 }
 
@@ -47,42 +47,6 @@ func NewPartialAddress(block *hcl.Block) ([]RawAddress, hcl.Diagnostics) {
 	}
 
 	return addrs, nil
-}
-
-type addressAttribute struct {
-	name  string
-	label string
-	expr  hcl.Expression
-}
-
-func (a addressAttribute) GetFilename() string {
-	return a.expr.Range().Filename
-}
-
-func (a addressAttribute) GetName() string {
-	return a.name
-}
-
-func (a addressAttribute) GetPath() cty.Path {
-	return cty.GetAttrPath(a.label).GetAttr(a.name)
-}
-
-func (a addressAttribute) Dependencies() ([]hcl.Traversal, hcl.Diagnostics) {
-	return a.expr.Variables(), nil
-}
-
-func (a addressAttribute) Decode(ctx *hcl.EvalContext) ([]Action, hcl.Diagnostics) {
-	value, diagnostics := a.expr.Value(ctx)
-	if diagnostics.HasErrors() {
-		return nil, diagnostics
-	}
-
-	return []Action{
-		Local{
-			addressAttribute: a,
-			value:            value,
-		},
-	}, nil
 }
 
 type addressBlock struct {

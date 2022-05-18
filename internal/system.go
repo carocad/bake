@@ -80,7 +80,12 @@ func (state System) Plan(target string) ([]lang.Action, hcl.Diagnostics) {
 		return nil, diags
 	}
 
-	actions, diags := state.root.Plan(target, addrs)
+	task, diags := state.root.GetTask(target, addrs)
+	if diags.HasErrors() {
+		return nil, diags
+	}
+
+	actions, diags := state.root.Plan(task, addrs)
 	if diags.HasErrors() {
 		return nil, diags
 	}

@@ -2,8 +2,10 @@ package module
 
 import (
 	"context"
+	"fmt"
 
 	"bake/internal/concurrent"
+	"bake/internal/functional"
 	"bake/internal/lang"
 	"bake/internal/topo"
 	"github.com/hashicorp/hcl/v2"
@@ -17,69 +19,57 @@ type Module struct {
 	cwd  string
 }
 
-func (module Module) Plan(target string, addresses []lang.RawAddress) ([]lang.Action, hcl.Diagnostics) {
-	for _, address := range addresses {
+func (module Module) Plan(task lang.RawAddress, addresses []lang.RawAddress) ([]lang.Action, hcl.Diagnostics) {
+	allDeps, diags := topo.AllDependencies(task, addresses)
+	if diags.HasErrors() {
+		return nil, diags
+	}
 
-		if lang.PathString(address.GetPath()) != target {
-			continue
-		}
+	taskDependencies := allDeps[lang.AddressToString(task)]
+	result := concurrent.NewSlice[lang.Action]()
+	coordinator := concurrent.NewCoordinator(context.TODO(), concurrent.DefaultParallelism)
+	for _, dep := range taskDependencies {
+		innerDepedencies := allDeps[lang.AddressToString(dep)]
+		depIDs := functional.Map(innerDepedencies[:len(innerDepedencies)-1], lang.RawAddressToString)
+		taskID := lang.AddressToString(dep)
+		dep := dep // // https://golang.org/doc/faq#closures_and_goroutines
 
-		deps, diags := topo.Dependencies(address, addresses, lang.GlobalPrefixes)
-		if diags.HasErrors() {
-			return nil, diags
-		}
-
-		result := concurrent.NewSlice[lang.Action]()
-		coordinator := concurrent.NewCoordinator(context.TODO(), concurrent.DefaultParallelism)
-		for _, dep := range deps {
-			requires, diags := topo.Dependencies(dep, addresses, lang.GlobalPrefixes)
+		coordinator.Do(taskID, depIDs, func() error {
+			eval := module.Context(dep, result.Items())
+			actions, diags := dep.Decode(eval)
 			if diags.HasErrors() {
-				return nil, diags
+				return diags
 			}
 
-			ids := lang.DependencyIds(requires[:len(requires)-1])
-			dep := dep // // https://golang.org/doc/faq#closures_and_goroutines
-			coordinator.Do(lang.PathString(dep.GetPath()), ids, func() error {
-				eval := module.Context(dep, result.Items())
-				actions, diags := dep.Decode(eval)
+			if !dep.GetPath().HasPrefix(lang.DataPrefix) {
+				result.Extend(actions)
+				return nil
+			}
+
+			// we need to refresh before the next actions are loaded since
+			// they depend on the data values
+			for _, action := range actions {
+				diags := action.Apply()
 				if diags.HasErrors() {
 					return diags
 				}
+			}
 
-				if !dep.GetPath().HasPrefix(lang.DataPrefix) {
-					result.Extend(actions)
-					return nil
-				}
-
-				// we need to refresh before the next actions are loaded since
-				// they depend on the data values
-				for _, action := range actions {
-					diags := action.Apply()
-					if diags.HasErrors() {
-						return diags
-					}
-				}
-
-				result.Extend(actions)
-				return nil
-			})
-		}
-		err := coordinator.Wait()
-		if diags, ok := err.(hcl.Diagnostics); ok {
-			return nil, diags
-		}
-
-		if err != nil {
-			panic(err)
-		}
-
-		return result.Items(), nil
+			result.Extend(actions)
+			return nil
+		})
 	}
 
-	return nil, hcl.Diagnostics{{
-		Severity: hcl.DiagError,
-		Summary:  "couldn't find any target with name " + target,
-	}}
+	err := coordinator.Wait()
+	if diags, ok := err.(hcl.Diagnostics); ok {
+		return nil, diags
+	}
+
+	if err != nil {
+		panic(err)
+	}
+
+	return result.Items(), nil
 }
 
 func NewRootModule(cwd string) *Module {
@@ -97,4 +87,26 @@ func (module Module) Path() cty.Path {
 	}
 
 	return cty.GetAttrPath("module").GetAttr(module.name)
+}
+
+func (module Module) GetTask(name string, addresses []lang.RawAddress) (lang.RawAddress, hcl.Diagnostics) {
+	for _, address := range addresses {
+		if lang.PathString(address.GetPath()) != name {
+			continue
+		}
+
+		return address, nil
+	}
+
+	options := functional.Map(addresses, lang.RawAddressToString)
+	suggestion := functional.Suggest(name, options)
+	summary := "couldn't find any target with name " + name
+	if suggestion != "" {
+		summary += fmt.Sprintf(`. Did you mean "%s"`, suggestion)
+	}
+
+	return nil, hcl.Diagnostics{{
+		Severity: hcl.DiagError,
+		Summary:  summary,
+	}}
 }

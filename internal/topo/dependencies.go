@@ -3,8 +3,8 @@ package topo
 import (
 	"fmt"
 
+	"bake/internal/functional"
 	"bake/internal/lang"
-	"github.com/agext/levenshtein"
 	"github.com/hashicorp/hcl/v2"
 	"github.com/zclconf/go-cty/cty"
 )
@@ -28,17 +28,37 @@ type addressMark struct {
 	mark
 }
 
+// AllDependencies returns a map of address string to raw addresses
+func AllDependencies(task lang.RawAddress, addresses []lang.RawAddress) (map[string][]lang.RawAddress, hcl.Diagnostics) {
+	deps, diags := Dependencies(task, addresses)
+	if diags.HasErrors() {
+		return nil, diags
+	}
+
+	result := map[string][]lang.RawAddress{}
+	for _, dep := range deps {
+		inner, diags := Dependencies(dep, addresses)
+		if diags.HasErrors() {
+			return nil, diags
+		}
+
+		result[lang.RawAddressToString(dep)] = inner
+	}
+
+	return result, nil
+}
+
 // Dependencies sorting according to
 // https://www.wikiwand.com/en/Topological_sorting#/Depth-first_search
 // NOTE: the task itself is the last element of the dependency list
-func Dependencies(addr lang.RawAddress, addresses []lang.RawAddress, globals cty.PathSet) ([]lang.RawAddress, hcl.Diagnostics) {
+func Dependencies(addr lang.RawAddress, addresses []lang.RawAddress) ([]lang.RawAddress, hcl.Diagnostics) {
 	path := lang.PathString(addr.GetPath())
 	sorter := depthFirst{
 		addresses: addresses,
 		markers: map[string]*addressMark{
 			path: {addr, unmarked},
 		},
-		global: globals,
+		global: lang.GlobalPrefixes,
 	}
 
 	order, diags := sorter.visit(path)
@@ -113,7 +133,8 @@ func (sorter depthFirst) getByPrefix(traversal hcl.Traversal) (lang.RawAddress, 
 		}
 	}
 
-	suggestion := sorter.suggest(path)
+	options := functional.Map(sorter.addresses, lang.RawAddressToString)
+	suggestion := functional.Suggest(lang.PathString(path), options)
 	summary := "unknown reference"
 	if suggestion != "" {
 		summary += fmt.Sprintf(`, did you mean "%s"?`, suggestion)
@@ -135,20 +156,4 @@ func (sorter depthFirst) ignoreRef(traversal hcl.Traversal) bool {
 	}
 
 	return false
-}
-
-func (sorter depthFirst) suggest(search cty.Path) string {
-	searchText := lang.PathString(search)
-	suggestion := ""
-	bestDistance := len(searchText)
-	for _, addr := range sorter.addresses {
-		typo := lang.PathString(addr.GetPath())
-		dist := levenshtein.Distance(searchText, typo, nil)
-		if dist < bestDistance {
-			suggestion = typo
-			bestDistance = dist
-		}
-	}
-
-	return suggestion
 }

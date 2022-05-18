@@ -51,11 +51,10 @@ func PathString(path cty.Path) string {
 	return result
 }
 
-func DependencyIds(deps []RawAddress) []string {
-	result := make([]string, 0)
-	for _, dep := range deps {
-		result = append(result, PathString(dep.GetPath()))
-	}
+func AddressToString(addr Address) string {
+	return PathString(addr.GetPath())
+}
 
-	return result
+func RawAddressToString(addr RawAddress) string {
+	return AddressToString(addr)
 }
