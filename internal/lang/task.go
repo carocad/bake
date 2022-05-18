@@ -36,7 +36,7 @@ func (t *Task) Apply() hcl.Diagnostics {
 		return nil
 	}
 
-	log.Println("executing " + PathString(t.Path()))
+	log.Println("executing " + PathString(t.GetPath()))
 
 	terminal := "bash"
 	shell, ok := os.LookupEnv("SHELL")
@@ -68,7 +68,7 @@ func (t *Task) Apply() hcl.Diagnostics {
 	if err != nil {
 		return hcl.Diagnostics{{
 			Severity: hcl.DiagError,
-			Summary:  fmt.Sprintf(`"%s" task failed with exit code %d`, PathString(t.Path()), t.exitCode.Int64),
+			Summary:  fmt.Sprintf(`"%s" task failed with exit code %d`, PathString(t.GetPath()), t.exitCode.Int64),
 			Detail:   detail,
 			Subject:  getCommandRange(t.block),
 			Context:  t.block.DefRange.Ptr(),

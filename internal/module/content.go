@@ -26,26 +26,12 @@ func (module *Module) GetContent(file *hcl.File) ([]lang.RawAddress, hcl.Diagnos
 	return addrs, nil
 }
 
-func (module Module) Context(addr lang.RawAddress, fileAddrs map[string][]lang.RawAddress, actions []lang.Action) *hcl.EvalContext {
-	addrFile := ""
-	for filename, addresses := range fileAddrs {
-		for _, address := range addresses {
-			if address.Path().Equals(addr.Path()) {
-				addrFile = filename
-				break
-			}
-		}
-	}
-
-	if addrFile == "" {
-		panic("couldn't find address on read files, please notify bake developers")
-	}
-
+func (module Module) Context(addr lang.RawAddress, actions []lang.Action) *hcl.EvalContext {
 	variables := map[string]cty.Value{
 		"path": cty.ObjectVal(map[string]cty.Value{
 			"root":    cty.StringVal(module.cwd),
-			"module":  cty.StringVal(filepath.Join(module.cwd, filepath.Dir(addrFile))),
-			"current": cty.StringVal(filepath.Join(module.cwd, addrFile)),
+			"module":  cty.StringVal(filepath.Join(module.cwd, filepath.Dir(addr.GetFilename()))),
+			"current": cty.StringVal(filepath.Join(module.cwd, addr.GetFilename())),
 		}),
 	}
 
@@ -53,7 +39,7 @@ func (module Module) Context(addr lang.RawAddress, fileAddrs map[string][]lang.R
 	local := map[string]cty.Value{}
 	for _, act := range actions {
 		name := act.GetName()
-		path := act.Path()
+		path := act.GetPath()
 		value := act.CTY()
 		switch {
 		case path.HasPrefix(lang.DataPrefix):

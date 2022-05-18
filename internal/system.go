@@ -15,14 +15,11 @@ type System struct {
 	root   *module.Module // the root module
 	parser *hclparse.Parser
 	cwd    string
-	Logger hcl.DiagnosticWriter
 }
 
 func NewSystem() (*System, hcl.Diagnostics) {
 	// create a parser
 	parser := hclparse.NewParser()
-	// setup a pretty printer for errors
-	logger := hcl.NewDiagnosticTextWriter(os.Stdout, parser.Files(), 78, true)
 	// where are we?
 	cwd, err := os.Getwd()
 	if err != nil {
@@ -36,13 +33,15 @@ func NewSystem() (*System, hcl.Diagnostics) {
 	return &System{
 		root:   module.NewRootModule(cwd),
 		parser: parser,
-		Logger: logger,
 		cwd:    cwd,
 	}, nil
 }
 
-func (state System) readRecipes() (map[string][]lang.RawAddress, hcl.Diagnostics) {
-	fileAddresses := map[string][]lang.RawAddress{}
+func (state System) NewLogger() hcl.DiagnosticWriter {
+	return hcl.NewDiagnosticTextWriter(os.Stdout, state.parser.Files(), 78, true)
+}
+
+func (state System) readRecipes() ([]lang.RawAddress, hcl.Diagnostics) {
 	files, err := ioutil.ReadDir(state.cwd)
 	if err != nil {
 		return nil, hcl.Diagnostics{{
@@ -52,6 +51,7 @@ func (state System) readRecipes() (map[string][]lang.RawAddress, hcl.Diagnostics
 		}}
 	}
 
+	addresses := make([]lang.RawAddress, 0)
 	for _, filename := range files {
 		if filepath.Ext(filename.Name()) != ".hcl" { // todo: change to .rcp
 			continue
@@ -68,10 +68,10 @@ func (state System) readRecipes() (map[string][]lang.RawAddress, hcl.Diagnostics
 			return nil, diags
 		}
 
-		fileAddresses[filename.Name()] = addrs
+		addresses = append(addresses, addrs...)
 	}
 
-	return fileAddresses, nil
+	return addresses, nil
 }
 
 func (state System) Plan(target string) ([]lang.Action, hcl.Diagnostics) {

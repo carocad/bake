@@ -17,65 +17,63 @@ type Module struct {
 	cwd  string
 }
 
-func (module Module) Plan(target string, filePartials map[string][]lang.RawAddress) ([]lang.Action, hcl.Diagnostics) {
-	for _, addresses := range filePartials {
-		for _, act := range addresses {
+func (module Module) Plan(target string, addresses []lang.RawAddress) ([]lang.Action, hcl.Diagnostics) {
+	for _, address := range addresses {
 
-			if lang.PathString(act.Path()) != target {
-				continue
-			}
+		if lang.PathString(address.GetPath()) != target {
+			continue
+		}
 
-			deps, diags := topo.Dependencies(act, filePartials, lang.GlobalPrefixes)
+		deps, diags := topo.Dependencies(address, addresses, lang.GlobalPrefixes)
+		if diags.HasErrors() {
+			return nil, diags
+		}
+
+		result := concurrent.NewSlice[lang.Action]()
+		coordinator := concurrent.NewCoordinator(context.TODO(), concurrent.DefaultParallelism)
+		for _, dep := range deps {
+			requires, diags := topo.Dependencies(dep, addresses, lang.GlobalPrefixes)
 			if diags.HasErrors() {
 				return nil, diags
 			}
 
-			result := concurrent.NewSlice[lang.Action]()
-			coordinator := concurrent.NewCoordinator(context.TODO(), concurrent.DefaultParallelism)
-			for _, dep := range deps {
-				requires, diags := topo.Dependencies(dep, filePartials, lang.GlobalPrefixes)
+			ids := lang.DependencyIds(requires[:len(requires)-1])
+			dep := dep // // https://golang.org/doc/faq#closures_and_goroutines
+			coordinator.Do(lang.PathString(dep.GetPath()), ids, func() error {
+				eval := module.Context(dep, result.Items())
+				actions, diags := dep.Decode(eval)
 				if diags.HasErrors() {
-					return nil, diags
+					return diags
 				}
 
-				ids := lang.DependencyIds(requires[:len(requires)-1])
-				dep := dep // // https://golang.org/doc/faq#closures_and_goroutines
-				coordinator.Do(lang.PathString(dep.Path()), ids, func() error {
-					eval := module.Context(dep, filePartials, result.Items())
-					actions, diags := dep.Decode(eval)
+				if !dep.GetPath().HasPrefix(lang.DataPrefix) {
+					result.Extend(actions)
+					return nil
+				}
+
+				// we need to refresh before the next actions are loaded since
+				// they depend on the data values
+				for _, action := range actions {
+					diags := action.Apply()
 					if diags.HasErrors() {
 						return diags
 					}
+				}
 
-					if !dep.Path().HasPrefix(lang.DataPrefix) {
-						result.Extend(actions)
-						return nil
-					}
-
-					// we need to refresh before the next actions are loaded since
-					// they depend on the data values
-					for _, action := range actions {
-						diags := action.Apply()
-						if diags.HasErrors() {
-							return diags
-						}
-					}
-
-					result.Extend(actions)
-					return nil
-				})
-			}
-			err := coordinator.Wait()
-			if diags, ok := err.(hcl.Diagnostics); ok {
-				return nil, diags
-			}
-
-			if err != nil {
-				panic(err)
-			}
-
-			return result.Items(), nil
+				result.Extend(actions)
+				return nil
+			})
 		}
+		err := coordinator.Wait()
+		if diags, ok := err.(hcl.Diagnostics); ok {
+			return nil, diags
+		}
+
+		if err != nil {
+			panic(err)
+		}
+
+		return result.Items(), nil
 	}
 
 	return nil, hcl.Diagnostics{{

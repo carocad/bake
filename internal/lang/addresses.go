@@ -9,7 +9,8 @@ import (
 
 type Address interface {
 	GetName() string
-	Path() cty.Path
+	GetPath() cty.Path
+	GetFilename() string
 }
 
 type Action interface {
@@ -54,11 +55,15 @@ type addressAttribute struct {
 	expr  hcl.Expression
 }
 
+func (a addressAttribute) GetFilename() string {
+	return a.expr.Range().Filename
+}
+
 func (a addressAttribute) GetName() string {
 	return a.name
 }
 
-func (a addressAttribute) Path() cty.Path {
+func (a addressAttribute) GetPath() cty.Path {
 	return cty.GetAttrPath(a.label).GetAttr(a.name)
 }
 
@@ -84,11 +89,15 @@ type addressBlock struct {
 	block *hcl.Block
 }
 
+func (n addressBlock) GetFilename() string {
+	return n.block.DefRange.Filename
+}
+
 func (n addressBlock) GetName() string {
 	return n.block.Labels[0]
 }
 
-func (n addressBlock) Path() cty.Path {
+func (n addressBlock) GetPath() cty.Path {
 	if n.block.Type == TaskLabel {
 		return cty.GetAttrPath(n.GetName())
 	}
@@ -113,26 +122,26 @@ func (n addressBlock) Dependencies() ([]hcl.Traversal, hcl.Diagnostics) {
 func (n addressBlock) Decode(ctx *hcl.EvalContext) ([]Action, hcl.Diagnostics) {
 	switch n.block.Type {
 	case TaskLabel:
-		target := Task{addressBlock: n}
-		diagnostics := gohcl.DecodeBody(n.block.Body, ctx, &target)
+		task := &Task{addressBlock: n}
+		diagnostics := gohcl.DecodeBody(n.block.Body, ctx, task)
 		if diagnostics.HasErrors() {
 			return nil, diagnostics
 		}
 
-		diagnostics = checkDependsOn(target.Remain)
+		diagnostics = checkDependsOn(task.Remain)
 		if diagnostics.HasErrors() {
 			return nil, diagnostics
 		}
 
-		return []Action{&target}, nil
+		return []Action{task}, nil
 	case DataLabel:
-		data := Data{addressBlock: n}
-		diagnostics := gohcl.DecodeBody(n.block.Body, ctx, &data)
+		data := &Data{addressBlock: n}
+		diagnostics := gohcl.DecodeBody(n.block.Body, ctx, data)
 		if diagnostics.HasErrors() {
 			return nil, diagnostics
 		}
 
-		return []Action{&data}, nil
+		return []Action{data}, nil
 	default:
 		panic("missing label implementation " + n.block.Type)
 	}

@@ -33,7 +33,7 @@ func (d *Data) Apply() hcl.Diagnostics {
 		return nil
 	}
 
-	log.Println("refreshing " + PathString(d.Path()))
+	log.Println("refreshing " + PathString(d.GetPath()))
 
 	terminal := "bash"
 	shell, ok := os.LookupEnv("SHELL")
@@ -75,7 +75,7 @@ func (d *Data) Apply() hcl.Diagnostics {
 	if err != nil {
 		return hcl.Diagnostics{{
 			Severity: hcl.DiagError,
-			Summary:  fmt.Sprintf(`"%s" command failed with exit code %d`, PathString(d.Path()), d.ExitCode.Int64),
+			Summary:  fmt.Sprintf(`"%s" command failed with exit code %d`, PathString(d.GetPath()), d.ExitCode.Int64),
 			Detail:   detail,
 			Subject:  getCommandRange(d.block),
 			Context:  d.block.DefRange.Ptr(),
