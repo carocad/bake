@@ -10,7 +10,7 @@ task "main" {
 }
 
 task "compile" {
-  filename = local.binary
+  creates = local.binary
   command  = "go build -o ${local.binary} ${local.main}"
   sources  = [local.main]
 
