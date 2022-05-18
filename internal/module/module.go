@@ -42,7 +42,7 @@ func (module Module) GetTask(name string, addresses []lang.RawAddress) (lang.Raw
 		return address, nil
 	}
 
-	options := functional.Map(addresses, lang.RawAddressToString)
+	options := functional.Map(addresses, lang.AddressToString[lang.RawAddress])
 	suggestion := functional.Suggest(name, options)
 	summary := "couldn't find any target with name " + name
 	if suggestion != "" {

@@ -12,6 +12,15 @@ func Map[T any, U any](slice []T, f func(T) U) []U {
 	return result
 }
 
+func Values[T any, U comparable](m map[U]T) []T {
+	result := make([]T, len(m))
+	for _, t := range m {
+		result = append(result, t)
+	}
+
+	return result
+}
+
 func Suggest(text string, options []string) string {
 	suggestion := ""
 	bestDistance := len(text)

@@ -11,19 +11,23 @@ import (
 )
 
 func (module Module) Plan(task lang.RawAddress, addresses []lang.RawAddress) ([]lang.Action, hcl.Diagnostics) {
-	allDeps, diags := topo.AllDependencies(task, addresses)
+	dependencies, diags := topo.AllDependencies(task, addresses)
 	if diags.HasErrors() {
 		return nil, diags
 	}
 
-	taskDependencies := allDeps[lang.AddressToString(task)]
+	taskDependencies := dependencies[lang.AddressToString(task)]
 	result := concurrent.NewSlice[lang.Action]()
 	coordinator := concurrent.NewCoordinator(context.TODO(), concurrent.DefaultParallelism)
-	for _, dep := range taskDependencies {
-		innerDepedencies := allDeps[lang.AddressToString(dep)]
-		depIDs := functional.Map(innerDepedencies[:len(innerDepedencies)-1], lang.RawAddressToString)
+	for _, address := range taskDependencies {
+		// get the dependencies of this task dependency
+		addrDeps := dependencies[lang.AddressToString(address)]
+		// we need to remove the last element since it is the address itself
+		depIDs := functional.Map(addrDeps[:len(addrDeps)-1], lang.AddressToString[lang.RawAddress])
 
-		dep := dep // // https://golang.org/doc/faq#closures_and_goroutines
+		// keep a reference to the original value due to closure and goroutine
+		// https://golang.org/doc/faq#closures_and_goroutines
+		dep := address
 		coordinator.Do(lang.AddressToString(dep), depIDs, func() error {
 			eval := module.Context(dep, result.Items())
 			actions, diags := dep.Decode(eval)
@@ -50,6 +54,7 @@ func (module Module) Plan(task lang.RawAddress, addresses []lang.RawAddress) ([]
 		})
 	}
 
+	// wait for all routines to finish so that we get all actions
 	err := coordinator.Wait()
 	if diags, ok := err.(hcl.Diagnostics); ok {
 		return nil, diags

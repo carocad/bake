@@ -6,16 +6,9 @@ import (
 	"bake/internal/functional"
 	"bake/internal/lang"
 	"github.com/hashicorp/hcl/v2"
-	"github.com/zclconf/go-cty/cty"
 )
 
-type depthFirst struct {
-	addresses []lang.RawAddress
-	markers   map[string]*addressMark
-	global    cty.PathSet
-}
-
-type mark int
+type marker int
 
 const (
 	unmarked = iota
@@ -23,26 +16,21 @@ const (
 	permanent
 )
 
-type addressMark struct {
-	lang.RawAddress
-	mark
-}
-
 // AllDependencies returns a map of address string to raw addresses
-func AllDependencies(task lang.RawAddress, addresses []lang.RawAddress) (map[string][]lang.RawAddress, hcl.Diagnostics) {
+func AllDependencies[T lang.Address](task T, addresses []T) (map[string][]T, hcl.Diagnostics) {
 	deps, diags := Dependencies(task, addresses)
 	if diags.HasErrors() {
 		return nil, diags
 	}
 
-	result := map[string][]lang.RawAddress{}
+	result := map[string][]T{}
 	for _, dep := range deps {
-		inner, diags := Dependencies(dep, addresses)
+		inner, diags := Dependencies[T](dep, addresses)
 		if diags.HasErrors() {
 			return nil, diags
 		}
 
-		result[lang.RawAddressToString(dep)] = inner
+		result[lang.AddressToString(dep)] = inner
 	}
 
 	return result, nil
@@ -51,17 +39,18 @@ func AllDependencies(task lang.RawAddress, addresses []lang.RawAddress) (map[str
 // Dependencies sorting according to
 // https://www.wikiwand.com/en/Topological_sorting#/Depth-first_search
 // NOTE: the task itself is the last element of the dependency list
-func Dependencies(addr lang.RawAddress, addresses []lang.RawAddress) ([]lang.RawAddress, hcl.Diagnostics) {
-	path := lang.PathString(addr.GetPath())
-	sorter := depthFirst{
-		addresses: addresses,
-		markers: map[string]*addressMark{
-			path: {addr, unmarked},
-		},
-		global: lang.GlobalPrefixes,
+func Dependencies[T lang.Address](addr T, addresses []T) ([]T, hcl.Diagnostics) {
+	mapping := map[string]T{}
+	for _, address := range addresses {
+		mapping[lang.AddressToString(address)] = address
 	}
 
-	order, diags := sorter.visit(path)
+	path := lang.PathString(addr.GetPath())
+	markers := map[string]marker{
+		path: unmarked,
+	}
+
+	order, diags := visit(path, markers, mapping)
 	if diags.HasErrors() {
 		return nil, diags
 	}
@@ -71,13 +60,13 @@ func Dependencies(addr lang.RawAddress, addresses []lang.RawAddress) ([]lang.Raw
 
 const cyclicalDependency = "cyclical dependency detected"
 
-func (sorter depthFirst) visit(current string) ([]lang.RawAddress, hcl.Diagnostics) {
-	id := sorter.markers[current]
-	if id.mark == permanent {
+func visit[T lang.Address](current string, markers map[string]marker, addresses map[string]T) ([]T, hcl.Diagnostics) {
+	mark := markers[current]
+	if mark == permanent {
 		return nil, nil
 	}
 
-	if id.mark == temporary {
+	if mark == temporary {
 		return nil, hcl.Diagnostics{{
 			Severity: hcl.DiagError,
 			Summary:  cyclicalDependency,
@@ -85,30 +74,26 @@ func (sorter depthFirst) visit(current string) ([]lang.RawAddress, hcl.Diagnosti
 		}}
 	}
 
-	id.mark = temporary
-	order := make([]lang.RawAddress, 0)
-	dependencies, diagnostics := id.Dependencies()
+	markers[current] = temporary
+	order := make([]T, 0)
+	dependencies, diagnostics := addresses[current].Dependencies()
 	if diagnostics.HasErrors() {
 		return nil, diagnostics
 	}
 
 	for _, dep := range dependencies {
-		if sorter.ignoreRef(dep) {
+		if ignoreRef(dep) {
 			continue
 		}
 
-		innerID, diags := sorter.getByPrefix(dep)
+		innerID, diags := getByPrefix(dep, addresses)
 		if diags.HasErrors() {
 			return nil, diags
 		}
 
 		// make sure we initialize the marker
-		path := lang.PathString(innerID.GetPath())
-		if _, found := sorter.markers[path]; !found {
-			sorter.markers[path] = &addressMark{innerID, unmarked}
-		}
-
-		inner, diags := sorter.visit(path)
+		path := lang.AddressToString(*innerID)
+		inner, diags := visit(path, markers, addresses)
 		if diags.HasErrors() {
 			for _, diag := range diags {
 				if diag.Summary == cyclicalDependency {
@@ -120,24 +105,24 @@ func (sorter depthFirst) visit(current string) ([]lang.RawAddress, hcl.Diagnosti
 
 		order = append(order, inner...)
 	}
-	id.mark = permanent
-	order = append(order, id.RawAddress)
+	markers[current] = permanent
+	order = append(order, addresses[current])
 	return order, nil
 }
 
-func (sorter depthFirst) getByPrefix(traversal hcl.Traversal) (lang.RawAddress, hcl.Diagnostics) {
+func getByPrefix[T lang.Address](traversal hcl.Traversal, addresses map[string]T) (*T, hcl.Diagnostics) {
 	path := lang.ToPath(traversal)
-	for _, address := range sorter.addresses {
+	for _, address := range addresses {
 		if path.HasPrefix(address.GetPath()) {
-			return address, nil
+			return &address, nil
 		}
 	}
 
-	options := functional.Map(sorter.addresses, lang.RawAddressToString)
+	options := functional.Map(functional.Values(addresses), lang.AddressToString[T])
 	suggestion := functional.Suggest(lang.PathString(path), options)
 	summary := "unknown reference"
 	if suggestion != "" {
-		summary += fmt.Sprintf(`, did you mean "%s"?`, suggestion)
+		summary += fmt.Sprintf(`. Did you mean "%s"?`, suggestion)
 	}
 
 	return nil, hcl.Diagnostics{{
@@ -147,9 +132,9 @@ func (sorter depthFirst) getByPrefix(traversal hcl.Traversal) (lang.RawAddress, 
 	}}
 }
 
-func (sorter depthFirst) ignoreRef(traversal hcl.Traversal) bool {
+func ignoreRef(traversal hcl.Traversal) bool {
 	traversalPath := lang.ToPath(traversal)
-	for _, path := range sorter.global.List() {
+	for _, path := range lang.GlobalPrefixes.List() {
 		if traversalPath.HasPrefix(path) {
 			return true
 		}

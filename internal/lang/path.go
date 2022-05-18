@@ -51,10 +51,6 @@ func PathString(path cty.Path) string {
 	return result
 }
 
-func AddressToString(addr Address) string {
+func AddressToString[T Address](addr T) string {
 	return PathString(addr.GetPath())
-}
-
-func RawAddressToString(addr RawAddress) string {
-	return AddressToString(addr)
 }
