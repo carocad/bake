@@ -3,6 +3,7 @@ package topo
 import (
 	"fmt"
 
+	"bake/internal/concurrent"
 	"bake/internal/functional"
 	"bake/internal/lang"
 
@@ -18,20 +19,20 @@ const (
 )
 
 // AllDependencies returns a map of address string to addresses
-func AllDependencies[T lang.Address](task T, addresses []T) (map[string][]T, hcl.Diagnostics) {
+func AllDependencies[T lang.Address](task T, addresses []T) (*concurrent.Map[T, []T], hcl.Diagnostics) {
 	deps, diags := Dependencies(task, addresses)
 	if diags.HasErrors() {
 		return nil, diags
 	}
 
-	result := map[string][]T{}
+	result := concurrent.NewMapBy[T, []T](lang.AddressToString[T])
 	for _, dep := range deps {
 		inner, diags := Dependencies(dep, addresses)
 		if diags.HasErrors() {
 			return nil, diags
 		}
 
-		result[lang.AddressToString(dep)] = inner
+		result.Put(dep, inner)
 	}
 
 	return result, nil

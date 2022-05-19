@@ -4,7 +4,6 @@ import (
 	"context"
 
 	"bake/internal/concurrent"
-	"bake/internal/functional"
 	"bake/internal/lang"
 	"bake/internal/topo"
 
@@ -17,19 +16,18 @@ func (module Module) Do(task lang.RawAddress, addresses []lang.RawAddress, dryRu
 		return nil, diags
 	}
 
-	taskDependencies := dependencies[lang.AddressToString(task)]
+	taskDependencies, _ := dependencies.Get(task)
 	result := concurrent.NewSlice[lang.Action]()
-	coordinator := concurrent.NewCoordinator(context.TODO(), concurrent.DefaultParallelism)
+	coordinator := concurrent.NewCoordinator[lang.RawAddress](context.TODO(), concurrent.DefaultParallelism)
 	for _, address := range taskDependencies {
 		// get the dependencies of this task dependency
-		addrDeps := dependencies[lang.AddressToString(address)]
+		addrDeps, _ := dependencies.Get(address)
 		// we need to remove the last element since it is the address itself
-		depIDs := functional.Map(addrDeps[:len(addrDeps)-1], lang.AddressToString[lang.RawAddress])
-
+		depIDs := addrDeps[:len(addrDeps)-1]
 		// keep a reference to the original value due to closure and goroutine
 		// https://golang.org/doc/faq#closures_and_goroutines
 		dep := address
-		coordinator.Do(lang.AddressToString(dep), depIDs, func() error {
+		coordinator.Do(dep, depIDs, func() error {
 			eval := module.Context(dep, result.Items())
 			actions, diags := dep.Decode(eval)
 			if diags.HasErrors() {

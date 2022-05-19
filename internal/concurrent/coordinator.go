@@ -1,6 +1,7 @@
 package concurrent
 
 import (
+	"bake/internal/lang"
 	"context"
 	"fmt"
 	"sync"
@@ -11,40 +12,36 @@ import (
 const DefaultParallelism = 4
 
 // Coordinator executes tasks in parallel respecting the dependencies between each task
-type Coordinator struct {
+type Coordinator[T lang.Address] struct {
 	pool    *errgroup.Group
-	ctx     context.Context
-	mutex   sync.Mutex                 // protects waiting
-	waiting map[string]*sync.WaitGroup // lazily initialized
+	waiting *Map[T, *sync.WaitGroup]
 }
 
-func NewCoordinator(ctx context.Context, parallelism int) Coordinator {
-	group, ctx2 := errgroup.WithContext(ctx)
+func NewCoordinator[T lang.Address](ctx context.Context, parallelism int) Coordinator[T] {
+	group, _ := errgroup.WithContext(ctx) // todo: do I need to return the context?
 	group.SetLimit(parallelism)
-	return Coordinator{
+	return Coordinator[T]{
 		pool:    group,
-		ctx:     ctx2,
-		waiting: map[string]*sync.WaitGroup{},
+		waiting: NewMapBy[T, *sync.WaitGroup](lang.AddressToString[T]),
 	}
 }
 
 // Do task with id on a separate go routine after its dependencies are done. All dependencies MUST
 // have a previously registered task, otherwise the entire task coordinator
 // is stopped and an error is returned
-func (coordinator *Coordinator) Do(id string, dependencies []string, f func() error) {
-	coordinator.mutex.Lock()
-	defer coordinator.mutex.Unlock()
-
+func (coordinator *Coordinator[T]) Do(id T, dependencies []T, f func() error) {
 	// have to execute this otherwise there would be a race condition between the routines
 	promise := &sync.WaitGroup{}
 	promise.Add(1)
-	coordinator.waiting[id] = promise
+	coordinator.waiting.Put(id, promise)
 
 	var err error
 	for _, dep := range dependencies {
-		waiter, ok := coordinator.waiting[dep]
+		waiter, ok := coordinator.waiting.Get(dep)
 		if !ok {
-			err = fmt.Errorf("missing task %s while processing %s", dep, id)
+			err = fmt.Errorf("missing task %s while processing %s",
+				lang.AddressToString(dep),
+				lang.AddressToString(id))
 			break
 		}
 
@@ -63,6 +60,6 @@ func (coordinator *Coordinator) Do(id string, dependencies []string, f func() er
 
 // Wait for all task to complete. If any task returned an error
 // it will be returned here
-func (coordinator *Coordinator) Wait() error {
+func (coordinator *Coordinator[T]) Wait() error {
 	return coordinator.pool.Wait()
 }
