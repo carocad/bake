@@ -7,10 +7,11 @@ import (
 	"bake/internal/functional"
 	"bake/internal/lang"
 	"bake/internal/topo"
+
 	"github.com/hashicorp/hcl/v2"
 )
 
-func (module Module) Plan(task lang.RawAddress, addresses []lang.RawAddress) ([]lang.Action, hcl.Diagnostics) {
+func (module Module) Do(task lang.RawAddress, addresses []lang.RawAddress, dryRun bool) ([]lang.Action, hcl.Diagnostics) {
 	dependencies, diags := topo.AllDependencies(task, addresses)
 	if diags.HasErrors() {
 		return nil, diags
@@ -35,13 +36,14 @@ func (module Module) Plan(task lang.RawAddress, addresses []lang.RawAddress) ([]
 				return diags
 			}
 
-			if !dep.GetPath().HasPrefix(lang.DataPrefix) {
-				result.Extend(actions)
+			result.Extend(actions)
+			// on dryRun we only apply the data refreshing
+			if !dryRun && !dep.GetPath().HasPrefix(lang.DataPrefix) {
 				return nil
 			}
 
-			// we need to refresh before the next actions are loaded since
-			// they depend on the data values
+			// TODO: make this run on parallel -> I will need this since for_each
+			// implementation will make each address return multiple actions :/
 			for _, action := range actions {
 				diags := action.Apply()
 				if diags.HasErrors() {
@@ -49,7 +51,6 @@ func (module Module) Plan(task lang.RawAddress, addresses []lang.RawAddress) ([]
 				}
 			}
 
-			result.Extend(actions)
 			return nil
 		})
 	}

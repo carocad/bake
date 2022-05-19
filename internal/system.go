@@ -7,6 +7,7 @@ import (
 
 	"bake/internal/lang"
 	"bake/internal/module"
+
 	"github.com/hashicorp/hcl/v2"
 	"github.com/hashicorp/hcl/v2/hclparse"
 )
@@ -74,7 +75,7 @@ func (state System) readRecipes() ([]lang.RawAddress, hcl.Diagnostics) {
 	return addresses, nil
 }
 
-func (state System) Plan(target string) ([]lang.Action, hcl.Diagnostics) {
+func (state System) Do(target string, dryRun bool) ([]lang.Action, hcl.Diagnostics) {
 	addrs, diags := state.readRecipes()
 	if diags.HasErrors() {
 		return nil, diags
@@ -85,7 +86,7 @@ func (state System) Plan(target string) ([]lang.Action, hcl.Diagnostics) {
 		return nil, diags
 	}
 
-	actions, diags := state.root.Plan(task, addrs)
+	actions, diags := state.root.Do(task, addrs, true)
 	if diags.HasErrors() {
 		return nil, diags
 	}
@@ -93,18 +94,12 @@ func (state System) Plan(target string) ([]lang.Action, hcl.Diagnostics) {
 	return actions, nil
 }
 
-func (state System) Apply(action string) hcl.Diagnostics {
-	actions, diags := state.Plan(action)
-	if diags.HasErrors() {
-		return diags
-	}
+func (state System) Plan(target string) hcl.Diagnostics {
+	_, diags := state.Do(target, true)
+	return diags
+}
 
-	for _, act := range actions {
-		diags = act.Apply()
-		if diags.HasErrors() {
-			return diags
-		}
-	}
-
-	return nil
+func (state System) Apply(target string) hcl.Diagnostics {
+	_, diags := state.Do(target, false)
+	return diags
 }
