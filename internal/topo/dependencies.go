@@ -5,6 +5,7 @@ import (
 
 	"bake/internal/functional"
 	"bake/internal/lang"
+
 	"github.com/hashicorp/hcl/v2"
 )
 
@@ -16,7 +17,7 @@ const (
 	permanent
 )
 
-// AllDependencies returns a map of address string to raw addresses
+// AllDependencies returns a map of address string to addresses
 func AllDependencies[T lang.Address](task T, addresses []T) (map[string][]T, hcl.Diagnostics) {
 	deps, diags := Dependencies(task, addresses)
 	if diags.HasErrors() {
@@ -25,7 +26,7 @@ func AllDependencies[T lang.Address](task T, addresses []T) (map[string][]T, hcl
 
 	result := map[string][]T{}
 	for _, dep := range deps {
-		inner, diags := Dependencies[T](dep, addresses)
+		inner, diags := Dependencies(dep, addresses)
 		if diags.HasErrors() {
 			return nil, diags
 		}
