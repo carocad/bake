@@ -4,9 +4,9 @@ locals {
 }
 
 task "main" {
-  command = "echo 'I did it :) ${data.version.std_out}'"
+  command = "echo 'I did it :) ${data.version.std_out}, ${data.revision.std_out}, ${data.branch.std_out}'"
 
-  depends_on = [compile]
+  depends_on = [compile, test]
 }
 
 task "compile" {
@@ -14,7 +14,7 @@ task "compile" {
   command  = "go build -o ${local.binary} ${local.main}"
   sources  = [local.main]
 
-  depends_on = [vet, test]
+  depends_on = [vet]
 }
 
 task "vet" {

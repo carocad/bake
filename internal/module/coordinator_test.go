@@ -141,6 +141,6 @@ func TestCustomCoordination(t *testing.T) {
 
 	duration := end.Sub(start)
 	if diff := math.Abs(duration.Seconds() - 0.8); diff > tolerance {
-		t.Errorf("expected around 1 seconds but got %f", duration.Seconds())
+		t.Errorf("expected around 0.8 seconds but got %f", duration.Seconds())
 	}
 }
