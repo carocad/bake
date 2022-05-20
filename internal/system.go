@@ -1,6 +1,7 @@
 package internal
 
 import (
+	"context"
 	"io/ioutil"
 	"os"
 	"path/filepath"
@@ -75,7 +76,7 @@ func (state System) readRecipes() ([]lang.RawAddress, hcl.Diagnostics) {
 	return addresses, nil
 }
 
-func (state System) Do(target string, dryRun bool) ([]lang.Action, hcl.Diagnostics) {
+func (state System) Do(target string, eval lang.ContextData) ([]lang.Action, hcl.Diagnostics) {
 	addrs, diags := state.readRecipes()
 	if diags.HasErrors() {
 		return nil, diags
@@ -86,7 +87,8 @@ func (state System) Do(target string, dryRun bool) ([]lang.Action, hcl.Diagnosti
 		return nil, diags
 	}
 
-	actions, diags := state.root.Do(task, addrs, true)
+	coordinator := module.NewCoordinator(context.TODO(), eval)
+	actions, diags := coordinator.Do(task, addrs)
 	if diags.HasErrors() {
 		return nil, diags
 	}
@@ -95,11 +97,13 @@ func (state System) Do(target string, dryRun bool) ([]lang.Action, hcl.Diagnosti
 }
 
 func (state System) Plan(target string) hcl.Diagnostics {
-	_, diags := state.Do(target, true)
+	eval := lang.NewContextData(state.cwd, true)
+	_, diags := state.Do(target, eval)
 	return diags
 }
 
 func (state System) Apply(target string) hcl.Diagnostics {
-	_, diags := state.Do(target, false)
+	eval := lang.NewContextData(state.cwd, false)
+	_, diags := state.Do(target, eval)
 	return diags
 }
