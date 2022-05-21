@@ -42,11 +42,13 @@ func (coordinator *Coordinator) Do(task lang.RawAddress, addresses []lang.RawAdd
 		return nil, diags
 	}
 
+	filecache := FileCache{}
 	taskDependencies, _ := allDependencies.Get(task)
 	for _, address := range taskDependencies {
 		// initialize this dependency wait group so that other goroutines can wait for it
 		promise := &sync.WaitGroup{}
 		coordinator.waiting.Put(address, promise)
+
 		// get the dependencies of this task dependency
 		addressDependencies, _ := allDependencies.Get(address)
 		// wait for all routines to finish so that we get all actions
@@ -70,6 +72,8 @@ func (coordinator *Coordinator) Do(task lang.RawAddress, addresses []lang.RawAdd
 
 		promise.Add(len(actions))
 		for _, action := range actions {
+			// todo: check if action should run here
+
 			// keep a reference to the original value due to closure and goroutine
 			// https://golang.org/doc/faq#closures_and_goroutines
 			action := action
