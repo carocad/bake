@@ -56,7 +56,8 @@ func (coordinator *Coordinator) Do(task lang.RawAddress, addresses []lang.RawAdd
 			return nil, diags
 		}
 
-		actions, diags := address.Decode(coordinator.eval.Context(address, coordinator.actions.Items()))
+		evalContext := coordinator.eval.Context(address, coordinator.actions.Items())
+		actions, diags := address.Decode(evalContext)
 		if diags.HasErrors() {
 			return nil, diags
 		}

@@ -2,8 +2,8 @@ package lang
 
 import (
 	"bake/internal/values"
+
 	"github.com/hashicorp/hcl/v2"
-	"github.com/hashicorp/hcl/v2/gohcl"
 	"github.com/zclconf/go-cty/cty"
 )
 
@@ -86,21 +86,14 @@ func (n addressBlock) Dependencies() ([]hcl.Traversal, hcl.Diagnostics) {
 func (n addressBlock) Decode(ctx *hcl.EvalContext) ([]Action, hcl.Diagnostics) {
 	switch n.block.Type {
 	case TaskLabel:
-		task := &Task{addressBlock: n}
-		diagnostics := gohcl.DecodeBody(n.block.Body, ctx, task)
-		if diagnostics.HasErrors() {
-			return nil, diagnostics
-		}
-
-		diagnostics = checkDependsOn(task.Remain)
+		task, diagnostics := NewTask(n, ctx)
 		if diagnostics.HasErrors() {
 			return nil, diagnostics
 		}
 
 		return []Action{task}, nil
 	case DataLabel:
-		data := &Data{addressBlock: n}
-		diagnostics := gohcl.DecodeBody(n.block.Body, ctx, data)
+		data, diagnostics := NewData(n, ctx)
 		if diagnostics.HasErrors() {
 			return nil, diagnostics
 		}

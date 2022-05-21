@@ -9,7 +9,9 @@ import (
 	"strings"
 
 	"bake/internal/values"
+
 	"github.com/hashicorp/hcl/v2"
+	"github.com/hashicorp/hcl/v2/gohcl"
 	"github.com/zclconf/go-cty/cty"
 )
 
@@ -21,6 +23,21 @@ type Task struct { // todo: what is really optional?
 	Sources     []string `hcl:"sources,optional"`
 	Remain      hcl.Body `hcl:",remain"`
 	exitCode    values.EventualInt64
+}
+
+func NewTask(raw addressBlock, ctx *hcl.EvalContext) (*Task, hcl.Diagnostics) {
+	task := &Task{addressBlock: raw}
+	diagnostics := gohcl.DecodeBody(raw.block.Body, ctx, task)
+	if diagnostics.HasErrors() {
+		return nil, diagnostics
+	}
+
+	diagnostics = checkDependsOn(task.Remain)
+	if diagnostics.HasErrors() {
+		return nil, diagnostics
+	}
+
+	return task, nil
 }
 
 func (t Task) CTY() cty.Value {

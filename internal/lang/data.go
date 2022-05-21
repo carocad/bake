@@ -9,7 +9,9 @@ import (
 	"strings"
 
 	"bake/internal/values"
+
 	"github.com/hashicorp/hcl/v2"
+	"github.com/hashicorp/hcl/v2/gohcl"
 	"github.com/zclconf/go-cty/cty"
 )
 
@@ -19,6 +21,16 @@ type Data struct {
 	StdOut   values.EventualString
 	StdErr   values.EventualString
 	ExitCode values.EventualInt64
+}
+
+func NewData(raw addressBlock, ctx *hcl.EvalContext) (*Data, hcl.Diagnostics) {
+	data := &Data{addressBlock: raw}
+	diagnostics := gohcl.DecodeBody(raw.block.Body, ctx, data)
+	if diagnostics.HasErrors() {
+		return nil, diagnostics
+	}
+
+	return data, nil
 }
 
 func (d Data) CTY() cty.Value {
