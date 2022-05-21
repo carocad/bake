@@ -14,7 +14,6 @@ import (
 )
 
 type System struct {
-	root   *module.Module // the root module
 	parser *hclparse.Parser
 	cwd    string
 }
@@ -33,7 +32,6 @@ func NewSystem() (*System, hcl.Diagnostics) {
 	}
 
 	return &System{
-		root:   module.NewRootModule(cwd),
 		parser: parser,
 		cwd:    cwd,
 	}, nil
@@ -65,12 +63,18 @@ func (state System) readRecipes() ([]lang.RawAddress, hcl.Diagnostics) {
 			return nil, diags
 		}
 
-		addrs, diags := state.root.GetContent(f)
+		content, diags := f.Body.Content(lang.RecipeSchema())
 		if diags.HasErrors() {
 			return nil, diags
 		}
 
-		addresses = append(addresses, addrs...)
+		for _, block := range content.Blocks {
+			address, diagnostics := lang.NewPartialAddress(block)
+			if diagnostics.HasErrors() {
+				return nil, diagnostics
+			}
+			addresses = append(addresses, address...)
+		}
 	}
 
 	return addresses, nil
@@ -82,7 +86,7 @@ func (state System) Do(target string, eval lang.ContextData) ([]lang.Action, hcl
 		return nil, diags
 	}
 
-	task, diags := state.root.GetTask(target, addrs)
+	task, diags := module.GetTask(target, addrs)
 	if diags.HasErrors() {
 		return nil, diags
 	}
