@@ -6,11 +6,64 @@ import (
 	"bake/internal/topo"
 	"context"
 	"fmt"
+	"log"
+	"os"
 	"sync"
 
 	"github.com/hashicorp/hcl/v2"
 	"golang.org/x/sync/errgroup"
 )
+
+// example from make target --dry-run --debug
+/* TARGET
+% make server/cmd/main.bin --dry-run --debug
+GNU Make 4.3
+Built for x86_64-apple-darwin20.1.0
+Copyright (C) 1988-2020 Free Software Foundation, Inc.
+License GPLv3+: GNU GPL version 3 or later <http://gnu.org/licenses/gpl.html>
+This is free software: you are free to change and redistribute it.
+There is NO WARRANTY, to the extent permitted by law.
+Reading makefiles...
+Updating makefiles....
+Updating goal targets....
+ Prerequisite 'go.mod' is newer than target 'server/cmd/main.bin'.
+ Prerequisite 'internal/strings.go' is newer than target 'server/cmd/main.bin'.
+ Prerequisite 'server/system.go' is newer than target 'server/cmd/main.bin'.
+ Prerequisite 'server/hardware/artifactory/artifactory_release_sets.go' is newer than target 'server/cmd/main.bin'.
+ Prerequisite 'server/hardware/artifactory/artifactory_release_set_test.go' is newer than target 'server/cmd/main.bin'.
+ Prerequisite 'server/hardware/mysql/artifactory_set.go' is newer than target 'server/cmd/main.bin'.
+ Prerequisite 'cli/cmd/main.go' is newer than target 'server/cmd/main.bin'.
+ Prerequisite 'cli/system.go' is newer than target 'server/cmd/main.bin'.
+ Prerequisite 'cli/launch.go' is newer than target 'server/cmd/main.bin'.
+ Prerequisite 'cli/launch_test.go' is newer than target 'server/cmd/main.bin'.
+Must remake target 'server/cmd/main.bin'.
+go test -c -v -tags=testIntegration -coverpkg=./... -o server/cmd/main.bin ./server/cmd/
+Successfully remade target file 'server/cmd/main.bin'.
+*/
+
+/* PHONY
+% make dev --dry-run --debug
+GNU Make 4.3
+Built for x86_64-apple-darwin20.1.0
+Copyright (C) 1988-2020 Free Software Foundation, Inc.
+License GPLv3+: GNU GPL version 3 or later <http://gnu.org/licenses/gpl.html>
+This is free software: you are free to change and redistribute it.
+There is NO WARRANTY, to the extent permitted by law.
+Reading makefiles...
+Updating makefiles....
+Updating goal targets....
+ File 'dev' does not exist.
+   File 'compose' does not exist.
+     File 'docker-base' does not exist.
+    Must remake target 'docker-base'.
+docker build -t devops/launch-assist/base:$(git describe --tags --abbrev=0) -t devops/launch-assist/base:$(git rev-parse --abbrev-ref HEAD | tr A-Z/ a-z-)-0 -t devops/launch-assist/base:latest --cache-from=devops/launch-assist/base --build-arg BUILDKIT_INLINE_CACHE=1 --build-arg GOPROXY='https://proxy.golang.org,direct' --build-arg NPM_USER --build-arg NPM_PASS -f Dockerfile .
+    Successfully remade target file 'docker-base'.
+  Must remake target 'compose'.
+docker-compose -f docker-compose.yaml up --build --remove-orphans
+  Successfully remade target file 'compose'.
+Must remake target 'dev'.
+Successfully remade target file 'dev'.
+*/
 
 // Coordinator executes tasks in parallel respecting the dependencies between each task
 type Coordinator struct {
@@ -42,7 +95,6 @@ func (coordinator *Coordinator) Do(task lang.RawAddress, addresses []lang.RawAdd
 		return nil, diags
 	}
 
-	filecache := FileCache{}
 	taskDependencies, _ := allDependencies.Get(task)
 	for _, address := range taskDependencies {
 		// initialize this dependency wait group so that other goroutines can wait for it
@@ -70,10 +122,19 @@ func (coordinator *Coordinator) Do(task lang.RawAddress, addresses []lang.RawAdd
 			return nil, nil
 		}
 
-		promise.Add(len(actions))
 		for _, action := range actions {
-			// todo: check if action should run here
+			shouldRun, description, diags := action.Plan()
+			if diags.HasErrors() {
+				return nil, diags
+			}
 
+			logger := log.New(os.Stdout, lang.PathString(action.GetPath())+": ", 0)
+			logger.Println(fmt.Sprintf(`%s`, description))
+			if !shouldRun {
+				continue
+			}
+
+			promise.Add(1)
 			// keep a reference to the original value due to closure and goroutine
 			// https://golang.org/doc/faq#closures_and_goroutines
 			action := action
@@ -83,6 +144,7 @@ func (coordinator *Coordinator) Do(task lang.RawAddress, addresses []lang.RawAdd
 				defer promise.Done()
 
 				diags := action.Apply()
+				// todo: display the time it took to apply the action
 				if diags.HasErrors() {
 					return diags
 				}

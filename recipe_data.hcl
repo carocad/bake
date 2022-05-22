@@ -1,3 +1,7 @@
+data "main" {
+  command = "find . -name main.go"
+}
+
 data "version" {
   command = "echo '${path.current}' && git describe --tags --abbrev=0 || true"
 }

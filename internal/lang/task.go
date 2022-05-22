@@ -3,9 +3,9 @@ package lang
 import (
 	"bytes"
 	"fmt"
-	"log"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"strings"
 
 	"bake/internal/values"
@@ -47,12 +47,63 @@ func (t Task) CTY() cty.Value {
 	return cty.ObjectVal(m)
 }
 
+func (t Task) Plan() (shouldApply bool, reason string, diags hcl.Diagnostics) {
+	// phony task
+	if len(t.Sources) == 0 || t.Creates == "" {
+		return true, `"sources" or "creates" was not specified ... baking phony task`, nil
+	}
+
+	// if the target doesn't exist then it should be created
+	targetInfo, err := os.Stat(t.Creates)
+	if err != nil {
+		return true, fmt.Sprintf(`"%s" doesn't exists ... baking`, t.Creates), nil
+	}
+
+	for _, pattern := range t.Sources {
+		// Check pattern is well-formed.
+		matches, err := filepath.Glob(pattern)
+		if err != nil {
+			return false, "", hcl.Diagnostics{{
+				Severity: hcl.DiagError,
+				Summary:  fmt.Sprintf(`pattern "%s" is malformed`, pattern),
+				Detail:   err.Error(),
+				Subject:  getSourcesRange(t.block),
+				Context:  t.block.DefRange.Ptr(),
+			}}
+		}
+
+		if len(matches) == 0 {
+			return false, fmt.Sprintf(`pattern "%s" doesn't match anything ... skipping`, strings.Join(t.Sources, ", ")), nil
+		}
+
+		for _, filename := range matches {
+			info, err := os.Stat(filename)
+			if err != nil {
+				return false, "", hcl.Diagnostics{{
+					Severity: hcl.DiagError,
+					Summary:  fmt.Sprintf(`error getting "%s" stat information`, filename),
+					Detail:   err.Error(),
+					Subject:  getSourcesRange(t.block),
+					Context:  t.block.DefRange.Ptr(),
+				}}
+			}
+
+			// sources are newer than target, create it
+			if info.ModTime().After(targetInfo.ModTime()) {
+				return true, fmt.Sprintf(`source "%s" is newer than "%s" ... baking`, filename, t.Creates), nil
+			}
+		}
+	}
+
+	return false, fmt.Sprintf(`no source matching "%s" is newer than "%s" ... skipping`, strings.Join(t.Sources, ""), t.Creates), nil
+}
+
 func (t *Task) Apply() hcl.Diagnostics {
 	if t.exitCode.Valid {
 		return nil
 	}
 
-	log.Println("executing " + PathString(t.GetPath()))
+	// log.Println("executing " + PathString(t.GetPath()))
 
 	terminal := "bash"
 	shell, ok := os.LookupEnv("SHELL")

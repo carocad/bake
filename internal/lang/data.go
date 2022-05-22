@@ -3,7 +3,6 @@ package lang
 import (
 	"bytes"
 	"fmt"
-	"log"
 	"os"
 	"os/exec"
 	"strings"
@@ -40,12 +39,16 @@ func (d Data) CTY() cty.Value {
 	return cty.ObjectVal(m)
 }
 
+func (d Data) Plan() (bool, string, hcl.Diagnostics) {
+	return true, `refreshing ...`, nil
+}
+
 func (d *Data) Apply() hcl.Diagnostics {
 	if d.ExitCode.Valid {
 		return nil
 	}
 
-	log.Println("refreshing " + PathString(d.GetPath()))
+	// log.Println("refreshing " + PathString(d.GetPath()))
 
 	terminal := "bash"
 	shell, ok := os.LookupEnv("SHELL")

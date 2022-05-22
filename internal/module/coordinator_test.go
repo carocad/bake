@@ -4,6 +4,7 @@ import (
 	"bake/internal/functional"
 	"bake/internal/lang"
 	"context"
+	"fmt"
 	"math"
 	"testing"
 	"time"
@@ -47,6 +48,11 @@ func (s fakeAddress) Decode(ctx *hcl.EvalContext) ([]lang.Action, hcl.Diagnostic
 func (s fakeAddress) CTY() cty.Value {
 	return cty.StringVal(s.name)
 }
+
+func (s fakeAddress) Plan() (bool, string, hcl.Diagnostics) {
+	return true, fmt.Sprintf(`refreshing "%s"`, lang.PathString(s.GetPath())), nil
+}
+
 func (s fakeAddress) Apply() hcl.Diagnostics {
 	time.Sleep(200 * time.Millisecond)
 	return nil

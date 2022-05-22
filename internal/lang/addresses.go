@@ -18,6 +18,7 @@ type Action interface {
 	Address
 	values.Cty
 	Apply() hcl.Diagnostics
+	Plan() (bool, string, hcl.Diagnostics)
 }
 
 type RawAddress interface {
