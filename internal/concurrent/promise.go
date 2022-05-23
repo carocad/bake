@@ -10,7 +10,7 @@ type Promise[T any] struct {
 	IsValid bool
 	Error   error
 	Value   T
-	wg      sync.WaitGroup
+	wg      *sync.WaitGroup
 }
 
 func NewPromise[T any](effect func() (T, error)) *Promise[T] {
@@ -18,7 +18,7 @@ func NewPromise[T any](effect func() (T, error)) *Promise[T] {
 }
 
 func NewPromiseGroup[T any](group *errgroup.Group, effect func() (T, error)) *Promise[T] {
-	wg := sync.WaitGroup{}
+	wg := &sync.WaitGroup{}
 	wg.Add(1)
 	promise := &Promise[T]{wg: wg}
 	group.Go(func() error {
