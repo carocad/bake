@@ -16,3 +16,4 @@
 /.idea/
 *.bin
 cmd/*.txt
+version.go

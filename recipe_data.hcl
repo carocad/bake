@@ -3,7 +3,7 @@ data "main" {
 }
 
 data "version" {
-  command = "echo '${path.current}' && git describe --tags --abbrev=0 || true"
+  command = "git describe --tags --abbrev=0 || true"
 }
 
 data "revision" {
