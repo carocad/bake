@@ -43,13 +43,3 @@ func checkDependsOn(body hcl.Body) hcl.Diagnostics {
 
 	return nil
 }
-
-/*
-Error: Unsupported argument
-
-  on recipe.hcl line 17, in target "first":
-  17:   depends_on = [phony.second]
-
-An argument named "depends_on" is not expected here.
-
-*/

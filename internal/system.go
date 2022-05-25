@@ -3,50 +3,22 @@ package internal
 import (
 	"context"
 	"io/ioutil"
-	"os"
 	"path/filepath"
 
 	"bake/internal/lang"
 	"bake/internal/module"
+	"bake/internal/state"
 
 	"github.com/hashicorp/hcl/v2"
 	"github.com/hashicorp/hcl/v2/hclparse"
 )
 
-type System struct {
-	parser *hclparse.Parser
-	cwd    string
-}
-
-func NewSystem() (*System, hcl.Diagnostics) {
-	// create a parser
-	parser := hclparse.NewParser()
-	// where are we?
-	cwd, err := os.Getwd()
+func ReadRecipes(cwd string, parser *hclparse.Parser) ([]lang.RawAddress, hcl.Diagnostics) {
+	files, err := ioutil.ReadDir(cwd)
 	if err != nil {
 		return nil, hcl.Diagnostics{{
 			Severity: hcl.DiagError,
-			Summary:  "couldn't get current working directory",
-			Detail:   err.Error(),
-		}}
-	}
-
-	return &System{
-		parser: parser,
-		cwd:    cwd,
-	}, nil
-}
-
-func (state System) NewLogger() hcl.DiagnosticWriter {
-	return hcl.NewDiagnosticTextWriter(os.Stdout, state.parser.Files(), 78, true)
-}
-
-func (state System) readRecipes() ([]lang.RawAddress, hcl.Diagnostics) {
-	files, err := ioutil.ReadDir(state.cwd)
-	if err != nil {
-		return nil, hcl.Diagnostics{{
-			Severity: hcl.DiagError,
-			Summary:  "couldn't read files in " + state.cwd,
+			Summary:  "couldn't read files in " + cwd,
 			Detail:   err.Error(),
 		}}
 	}
@@ -58,7 +30,7 @@ func (state System) readRecipes() ([]lang.RawAddress, hcl.Diagnostics) {
 		}
 
 		// read the file but don't decode it yet
-		f, diags := state.parser.ParseHCLFile(filename.Name())
+		f, diags := parser.ParseHCLFile(filename.Name())
 		if diags.HasErrors() {
 			return nil, diags
 		}
@@ -80,34 +52,17 @@ func (state System) readRecipes() ([]lang.RawAddress, hcl.Diagnostics) {
 	return addresses, nil
 }
 
-func (state System) Do(target string, eval lang.ContextData) ([]lang.Action, hcl.Diagnostics) {
-	addrs, diags := state.readRecipes()
+func Do(config *state.Config, addrs []lang.RawAddress) hcl.Diagnostics {
+	task, diags := module.GetTask(config.Task, addrs)
 	if diags.HasErrors() {
-		return nil, diags
+		return diags
 	}
 
-	task, diags := module.GetTask(target, addrs)
+	coordinator := module.NewCoordinator(context.TODO(), *config)
+	_, diags = coordinator.Do(task, addrs)
 	if diags.HasErrors() {
-		return nil, diags
+		return diags
 	}
 
-	coordinator := module.NewCoordinator(context.TODO(), eval)
-	actions, diags := coordinator.Do(task, addrs)
-	if diags.HasErrors() {
-		return nil, diags
-	}
-
-	return actions, nil
-}
-
-func (state System) Plan(target string) hcl.Diagnostics {
-	eval := lang.NewContextData(state.cwd, true)
-	_, diags := state.Do(target, eval)
-	return diags
-}
-
-func (state System) Apply(target string) hcl.Diagnostics {
-	eval := lang.NewContextData(state.cwd, false)
-	_, diags := state.Do(target, eval)
-	return diags
+	return nil
 }

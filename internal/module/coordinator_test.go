@@ -3,6 +3,7 @@ package module
 import (
 	"bake/internal/functional"
 	"bake/internal/lang"
+	"bake/internal/state"
 	"context"
 	"fmt"
 	"math"
@@ -66,8 +67,8 @@ func TestSerialCoordination(t *testing.T) {
 		data = append(data, fakeAddress{value, preData[:index]})
 	}
 
-	eval := lang.NewContextData(".", false)
-	coordinator := NewCoordinator(context.TODO(), eval)
+	eval := state.NewConfig(".")
+	coordinator := NewCoordinator(context.TODO(), *eval)
 	start := time.Now()
 	actions, diags := coordinator.Do(data[len(data)-1], data)
 	if diags.HasErrors() {
@@ -97,8 +98,8 @@ func TestParallelCoordination(t *testing.T) {
 		data = append(data, fakeAddress{value, nil})
 	}
 
-	eval := lang.NewContextData(".", false)
-	coordinator := NewCoordinator(context.TODO(), eval)
+	eval := state.NewConfig(".")
+	coordinator := NewCoordinator(context.TODO(), *eval)
 	start := time.Now()
 	_, diags := coordinator.Do(data[len(data)-1], data)
 	if diags.HasErrors() {
@@ -127,8 +128,8 @@ func TestCustomCoordination(t *testing.T) {
 	}}
 
 	addresses := functional.Map(data, func(f fakeAddress) lang.RawAddress { return f })
-	eval := lang.NewContextData(".", false)
-	coordinator := NewCoordinator(context.TODO(), eval)
+	eval := state.NewConfig(".")
+	coordinator := NewCoordinator(context.TODO(), *eval)
 	start := time.Now()
 	actions, diags := coordinator.Do(data[len(data)-1], addresses)
 	if diags.HasErrors() {

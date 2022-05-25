@@ -3,7 +3,8 @@ package module
 import (
 	"bake/internal/concurrent"
 	"bake/internal/lang"
-	"bake/internal/topo"
+	"bake/internal/module/topo"
+	"bake/internal/state"
 	"context"
 	"fmt"
 	"log"
@@ -71,10 +72,10 @@ type Coordinator struct {
 	pool    *errgroup.Group
 	waiting *concurrent.Map[lang.Address, *sync.WaitGroup]
 	actions *concurrent.Slice[lang.Action]
-	eval    lang.ContextData
+	eval    state.Config
 }
 
-func NewCoordinator(ctx context.Context, eval lang.ContextData) Coordinator {
+func NewCoordinator(ctx context.Context, eval state.Config) Coordinator {
 	// todo: do I need to return the context?
 	bounded, _ := errgroup.WithContext(ctx)
 	bounded.SetLimit(int(eval.Parallelism))
