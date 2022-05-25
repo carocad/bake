@@ -17,3 +17,4 @@
 *.bin
 cmd/*.txt
 version.go
+.vscode
