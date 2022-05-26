@@ -3,7 +3,6 @@ package main
 import (
 	"bake/internal"
 	"bake/internal/lang"
-	"bake/internal/state"
 	"fmt"
 	"os"
 
@@ -13,6 +12,13 @@ import (
 )
 
 func main() {
+	err := do()
+	if err != nil {
+		os.Exit(1)
+	}
+}
+
+func do() error {
 	// create a parser
 	parser := hclparse.NewParser()
 	// logger for diagnostics
@@ -20,28 +26,33 @@ func main() {
 	// where are we?
 	cwd, err := os.Getwd()
 	if err != nil {
-		Fatal(log, hcl.Diagnostics{{
+		log.WriteDiagnostic(&hcl.Diagnostic{
 			Severity: hcl.DiagError,
 			Summary:  "couldn't get current working directory",
 			Detail:   err.Error(),
-		}})
+		})
 	}
 
 	addrs, diags := internal.ReadRecipes(cwd, parser)
 	if diags.HasErrors() {
-		Fatal(log, diags)
+		log.WriteDiagnostics(diags)
 	}
 
 	app := App(addrs)
 	err = app.Run(os.Args)
-	os.Exit(2)
+	return nil
 
+	/* TODO
 	config := state.NewConfig(cwd)
 	config.Task = "main" // TODO
 	diags = internal.Do(config, addrs)
 	if diags.HasErrors() {
-		Fatal(log, diags)
+		log.WriteDiagnostics(diags)
 	}
+
+	return nil
+
+	*/
 }
 
 const (
