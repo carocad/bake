@@ -1,4 +1,4 @@
-package values
+package concurrent
 
 import (
 	"regexp"
@@ -6,7 +6,7 @@ import (
 )
 
 var matchFirstCap = regexp.MustCompile("(.)([A-Z][a-z]+)")
-var matchAllCap = regexp.MustCompile("([a-z\\d])([A-Z])")
+var matchAllCap = regexp.MustCompile(`([a-z\d])([A-Z])`)
 
 func ToSnakeCase(str string) string {
 	snake := matchFirstCap.ReplaceAllString(str, "${1}_${2}")

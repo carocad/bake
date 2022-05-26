@@ -98,8 +98,3 @@ func App(addrs []lang.RawAddress) *cli.App {
 	app.Commands = commands
 	return app
 }
-
-func Fatal(log hcl.DiagnosticWriter, diagnostics hcl.Diagnostics) {
-	log.WriteDiagnostics(diagnostics)
-	os.Exit(1)
-}
