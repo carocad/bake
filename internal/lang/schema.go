@@ -49,6 +49,8 @@ func IsKnownPrefix(path cty.Path) bool {
 	return false
 }
 
+// TODO: split this into separate structs, each with its own
+// name label and make 'description' a strict string in task
 func RecipeSchema() *hcl.BodySchema {
 	return &hcl.BodySchema{
 		Attributes: nil,
