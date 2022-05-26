@@ -9,38 +9,44 @@ import (
 	"github.com/hashicorp/hcl/v2"
 	"github.com/hashicorp/hcl/v2/hclparse"
 	"github.com/urfave/cli"
+	"github.com/zclconf/go-cty/cty"
 )
 
 func main() {
-	err := do()
+	// where are we?
+	cwd, err := os.Getwd()
 	if err != nil {
+		fmt.Println(err)
 		os.Exit(1)
+	}
+
+	log, diags := do(cwd)
+	if diags.HasErrors() {
+		log.WriteDiagnostics(diags)
+		os.Exit(2)
 	}
 }
 
-func do() error {
+func do(cwd string) (hcl.DiagnosticWriter, hcl.Diagnostics) {
 	// create a parser
 	parser := hclparse.NewParser()
 	// logger for diagnostics
 	log := hcl.NewDiagnosticTextWriter(os.Stdout, parser.Files(), 78, true)
-	// where are we?
-	cwd, err := os.Getwd()
-	if err != nil {
-		log.WriteDiagnostic(&hcl.Diagnostic{
-			Severity: hcl.DiagError,
-			Summary:  "couldn't get current working directory",
-			Detail:   err.Error(),
-		})
-	}
 
 	addrs, diags := internal.ReadRecipes(cwd, parser)
 	if diags.HasErrors() {
-		log.WriteDiagnostics(diags)
+		return log, diags
 	}
 
-	app := App(addrs)
-	err = app.Run(os.Args)
-	return nil
+	err := App(addrs).Run(os.Args)
+	if err != nil {
+		return log, hcl.Diagnostics{{
+			Severity: hcl.DiagError,
+			Summary:  err.Error(),
+		}}
+	}
+
+	return log, nil
 
 	/* TODO
 	config := state.NewConfig(cwd)
@@ -84,9 +90,35 @@ func App(addrs []lang.RawAddress) *cli.App {
 			continue
 		}
 
+		// can only be task block
+		block, ok := addr.(lang.AddressBlock)
+		if !ok {
+			continue
+		}
+
+		attrs, diags := block.Block.Body.JustAttributes()
+		if diags.HasErrors() {
+			continue
+		}
+
+		attr, ok := attrs[lang.DescripionAttr]
+		if !ok {
+			continue
+		}
+
+		val, diags := attr.Expr.Value(nil)
+		if diags.HasErrors() {
+			continue
+		}
+
+		if val.Type() != cty.String {
+			continue
+		}
+
+		description := val.AsString()
 		cmd := cli.Command{
 			Name:  addr.GetName(),
-			Usage: addr.GetFilename(),
+			Usage: description,
 			Action: func(c *cli.Context) error {
 				fmt.Println("added task: ", c.Args().First())
 				return nil

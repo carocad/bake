@@ -15,16 +15,16 @@ import (
 )
 
 type Data struct {
-	addressBlock
+	AddressBlock
 	Command  string `hcl:"command,optional"`
 	StdOut   values.EventualString
 	StdErr   values.EventualString
 	ExitCode values.EventualInt64
 }
 
-func NewData(raw addressBlock, ctx *hcl.EvalContext) (*Data, hcl.Diagnostics) {
-	data := &Data{addressBlock: raw}
-	diagnostics := gohcl.DecodeBody(raw.block.Body, ctx, data)
+func NewData(raw AddressBlock, ctx *hcl.EvalContext) (*Data, hcl.Diagnostics) {
+	data := &Data{AddressBlock: raw}
+	diagnostics := gohcl.DecodeBody(raw.Block.Body, ctx, data)
 	if diagnostics.HasErrors() {
 		return nil, diagnostics
 	}
@@ -92,8 +92,8 @@ func (d *Data) Apply() hcl.Diagnostics {
 			Severity: hcl.DiagError,
 			Summary:  fmt.Sprintf(`"%s" command failed with exit code %d`, PathString(d.GetPath()), d.ExitCode.Int64),
 			Detail:   detail,
-			Subject:  getCommandRange(d.block),
-			Context:  d.block.DefRange.Ptr(),
+			Subject:  GetRangeFor(d.Block, CommandAttr),
+			Context:  d.Block.DefRange.Ptr(),
 		}}
 	}
 

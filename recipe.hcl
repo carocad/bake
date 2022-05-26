@@ -10,8 +10,9 @@ locals {
 
 task "main" {
   command = "echo 'I did it :)'"
+  description = [local.reports_dir]
 
-  depends_on = [compile, test]
+  depends_on = [vet, compile, test]
 }
 
 task "compile" {
@@ -19,7 +20,7 @@ task "compile" {
   command  = "go build -o ${local.binary} ${local.main}"
   sources  = [local.go_sources]
 
-  depends_on = [vet, version]
+  depends_on = [version]
 }
 
 task "vet" {

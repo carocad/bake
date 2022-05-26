@@ -43,3 +43,23 @@ func checkDependsOn(body hcl.Body) hcl.Diagnostics {
 
 	return nil
 }
+
+func checkDescription(block *hcl.Block) hcl.Diagnostics {
+	attrs, diags := block.Body.JustAttributes()
+	if diags.HasErrors() {
+		return diags
+	}
+
+	for _, attr := range attrs {
+		if attr.Name != DescripionAttr {
+			continue
+		}
+
+		_, diags := attr.Expr.Value(nil)
+		if diags.HasErrors() {
+			return diags
+		}
+	}
+
+	return nil
+}

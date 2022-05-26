@@ -22,10 +22,11 @@ const (
 
 // attributes
 const (
-	DependsOnAttr = "depends_on"
-	CommandAttr   = "command"
-	SourcesAttr   = "sources"
-	ForEachAttr   = "for_each" // todo
+	DependsOnAttr  = "depends_on"
+	CommandAttr    = "command"
+	SourcesAttr    = "sources"
+	DescripionAttr = "description"
+	ForEachAttr    = "for_each" // todo
 )
 
 var (
@@ -49,9 +50,7 @@ func IsKnownPrefix(path cty.Path) bool {
 	return false
 }
 
-// TODO: split this into separate structs, each with its own
-// name label and make 'description' a strict string in task
-func RecipeSchema() *hcl.BodySchema {
+func FileSchema() *hcl.BodySchema {
 	return &hcl.BodySchema{
 		Attributes: nil,
 		Blocks: []hcl.BlockHeaderSchema{{

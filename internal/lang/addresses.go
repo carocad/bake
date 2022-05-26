@@ -27,51 +27,63 @@ type RawAddress interface {
 }
 
 func NewPartialAddress(block *hcl.Block) ([]RawAddress, hcl.Diagnostics) {
-	if block.Type != LocalsLabel {
-		return []RawAddress{addressBlock{
-			block: block,
+	switch block.Type {
+	case DataLabel:
+		return []RawAddress{AddressBlock{
+			Block: block,
 		}}, nil
+	case TaskLabel:
+		diags := checkDescription(block)
+		if diags.HasErrors() {
+			return nil, diags
+		}
+
+		return []RawAddress{AddressBlock{
+			Block: block,
+		}}, nil
+	case LocalsLabel:
+		attributes, diagnostics := block.Body.JustAttributes()
+		if diagnostics.HasErrors() {
+			return nil, diagnostics
+		}
+
+		addrs := make([]RawAddress, 0)
+		for name, attribute := range attributes {
+			addrs = append(addrs, addressAttribute{
+				name:  name,
+				label: LocalScope,
+				expr:  attribute.Expr,
+			})
+		}
+
+		return addrs, nil
+	default:
+		return nil, nil
 	}
-
-	attributes, diagnostics := block.Body.JustAttributes()
-	if diagnostics.HasErrors() {
-		return nil, diagnostics
-	}
-
-	addrs := make([]RawAddress, 0)
-	for name, attribute := range attributes {
-		addrs = append(addrs, addressAttribute{
-			name:  name,
-			label: LocalScope,
-			expr:  attribute.Expr,
-		})
-	}
-
-	return addrs, nil
 }
 
-type addressBlock struct {
-	block *hcl.Block
+type AddressBlock struct {
+	Block *hcl.Block
 }
 
-func (n addressBlock) GetFilename() string {
-	return n.block.DefRange.Filename
+func (n AddressBlock) GetFilename() string {
+	return n.Block.DefRange.Filename
 }
 
-func (n addressBlock) GetName() string {
-	return n.block.Labels[0]
+func (n AddressBlock) GetName() string {
+	return n.Block.Labels[0]
 }
 
-func (n addressBlock) GetPath() cty.Path {
-	if n.block.Type == TaskLabel {
+func (n AddressBlock) GetPath() cty.Path {
+	if n.Block.Type == TaskLabel {
 		return cty.GetAttrPath(n.GetName())
 	}
 
-	return cty.GetAttrPath(n.block.Type).GetAttr(n.GetName())
+	return cty.GetAttrPath(n.Block.Type).GetAttr(n.GetName())
 }
 
-func (n addressBlock) Dependencies() ([]hcl.Traversal, hcl.Diagnostics) {
-	attributes, diagnostics := n.block.Body.JustAttributes()
+func (n AddressBlock) Dependencies() ([]hcl.Traversal, hcl.Diagnostics) {
+	attributes, diagnostics := n.Block.Body.JustAttributes()
 	if diagnostics.HasErrors() {
 		return nil, diagnostics
 	}
@@ -84,8 +96,8 @@ func (n addressBlock) Dependencies() ([]hcl.Traversal, hcl.Diagnostics) {
 	return deps, nil
 }
 
-func (n addressBlock) Decode(ctx *hcl.EvalContext) ([]Action, hcl.Diagnostics) {
-	switch n.block.Type {
+func (n AddressBlock) Decode(ctx *hcl.EvalContext) ([]Action, hcl.Diagnostics) {
+	switch n.Block.Type {
 	case TaskLabel:
 		task, diagnostics := NewTask(n, ctx)
 		if diagnostics.HasErrors() {
@@ -101,6 +113,6 @@ func (n addressBlock) Decode(ctx *hcl.EvalContext) ([]Action, hcl.Diagnostics) {
 
 		return []Action{data}, nil
 	default:
-		panic("missing label implementation " + n.block.Type)
+		panic("missing label implementation " + n.Block.Type)
 	}
 }

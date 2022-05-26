@@ -16,7 +16,7 @@ import (
 )
 
 type Task struct { // todo: what is really optional?
-	addressBlock
+	AddressBlock
 	Description string   `hcl:"description,optional"`
 	Command     string   `hcl:"command,optional"`
 	Creates     string   `hcl:"creates,optional"`
@@ -25,9 +25,9 @@ type Task struct { // todo: what is really optional?
 	exitCode    values.EventualInt64
 }
 
-func NewTask(raw addressBlock, ctx *hcl.EvalContext) (*Task, hcl.Diagnostics) {
-	task := &Task{addressBlock: raw}
-	diagnostics := gohcl.DecodeBody(raw.block.Body, ctx, task)
+func NewTask(raw AddressBlock, ctx *hcl.EvalContext) (*Task, hcl.Diagnostics) {
+	task := &Task{AddressBlock: raw}
+	diagnostics := gohcl.DecodeBody(raw.Block.Body, ctx, task)
 	if diagnostics.HasErrors() {
 		return nil, diagnostics
 	}
@@ -67,8 +67,8 @@ func (t Task) Plan() (shouldApply bool, reason string, diags hcl.Diagnostics) {
 				Severity: hcl.DiagError,
 				Summary:  fmt.Sprintf(`pattern "%s" is malformed`, pattern),
 				Detail:   err.Error(),
-				Subject:  getSourcesRange(t.block),
-				Context:  t.block.DefRange.Ptr(),
+				Subject:  GetRangeFor(t.Block, SourcesAttr),
+				Context:  t.Block.DefRange.Ptr(),
 			}}
 		}
 
@@ -83,8 +83,8 @@ func (t Task) Plan() (shouldApply bool, reason string, diags hcl.Diagnostics) {
 					Severity: hcl.DiagError,
 					Summary:  fmt.Sprintf(`error getting "%s" stat information`, filename),
 					Detail:   err.Error(),
-					Subject:  getSourcesRange(t.block),
-					Context:  t.block.DefRange.Ptr(),
+					Subject:  GetRangeFor(t.Block, SourcesAttr),
+					Context:  t.Block.DefRange.Ptr(),
 				}}
 			}
 
@@ -137,8 +137,8 @@ func (t *Task) Apply() hcl.Diagnostics {
 			Severity: hcl.DiagError,
 			Summary:  fmt.Sprintf(`"%s" task failed with exit code %d`, PathString(t.GetPath()), t.exitCode.Int64),
 			Detail:   detail,
-			Subject:  getCommandRange(t.block),
-			Context:  t.block.DefRange.Ptr(),
+			Subject:  GetRangeFor(t.Block, CommandAttr),
+			Context:  t.Block.DefRange.Ptr(),
 		}}
 	}
 

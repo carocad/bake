@@ -35,7 +35,7 @@ func ReadRecipes(cwd string, parser *hclparse.Parser) ([]lang.RawAddress, hcl.Di
 			return nil, diags
 		}
 
-		content, diags := f.Body.Content(lang.RecipeSchema())
+		content, diags := f.Body.Content(lang.FileSchema())
 		if diags.HasErrors() {
 			return nil, diags
 		}
