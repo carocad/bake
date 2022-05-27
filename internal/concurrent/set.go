@@ -42,6 +42,10 @@ func (slice *Set[T]) Extend(items []T) {
 
 func (slice *Set[T]) Get(search T) (T, bool) {
 	index := slice.indexer(search)
+	return slice.GetBy(index)
+}
+
+func (slice *Set[T]) GetBy(index string) (T, bool) {
 	slice.mutex.RLock()
 	defer slice.mutex.RUnlock()
 
