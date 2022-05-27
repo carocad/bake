@@ -7,9 +7,9 @@ import (
 	"os"
 
 	"github.com/hashicorp/hcl/v2"
+	"github.com/hashicorp/hcl/v2/gohcl"
 	"github.com/hashicorp/hcl/v2/hclparse"
 	"github.com/urfave/cli"
-	"github.com/zclconf/go-cty/cty"
 )
 
 func main() {
@@ -91,34 +91,14 @@ func App(addrs []lang.RawAddress) *cli.App {
 		}
 
 		// can only be task block
-		block, ok := addr.(lang.AddressBlock)
-		if !ok {
+		desc := description(addr)
+		if desc == "" {
 			continue
 		}
 
-		attrs, diags := block.Block.Body.JustAttributes()
-		if diags.HasErrors() {
-			continue
-		}
-
-		attr, ok := attrs[lang.DescripionAttr]
-		if !ok {
-			continue
-		}
-
-		val, diags := attr.Expr.Value(nil)
-		if diags.HasErrors() {
-			continue
-		}
-
-		if val.Type() != cty.String {
-			continue
-		}
-
-		description := val.AsString()
 		cmd := cli.Command{
 			Name:  addr.GetName(),
-			Usage: description,
+			Usage: desc,
 			Action: func(c *cli.Context) error {
 				fmt.Println("added task: ", c.Args().First())
 				return nil
@@ -129,4 +109,29 @@ func App(addrs []lang.RawAddress) *cli.App {
 
 	app.Commands = commands
 	return app
+}
+
+func description(addr lang.RawAddress) string {
+	block, ok := addr.(lang.AddressBlock)
+	if !ok {
+		return ""
+	}
+
+	attrs, diags := block.Block.Body.JustAttributes()
+	if diags.HasErrors() {
+		return ""
+	}
+
+	attr, ok := attrs[lang.DescripionAttr]
+	if !ok {
+		return ""
+	}
+
+	var description string
+	diags = gohcl.DecodeExpression(attr.Expr, nil, &description)
+	if diags.HasErrors() {
+		return ""
+	}
+
+	return description
 }
