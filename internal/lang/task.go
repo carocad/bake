@@ -8,7 +8,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"bake/internal/values"
+	"bake/internal/lang/values"
 
 	"github.com/hashicorp/hcl/v2"
 	"github.com/hashicorp/hcl/v2/gohcl"

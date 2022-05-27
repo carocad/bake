@@ -1,7 +1,7 @@
 package lang
 
 import (
-	"bake/internal/values"
+	"bake/internal/lang/values"
 
 	"github.com/hashicorp/hcl/v2"
 	"github.com/zclconf/go-cty/cty"
