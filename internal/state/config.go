@@ -22,7 +22,7 @@ type Config struct {
 
 const DefaultParallelism = 4
 
-func NewConfig(cwd string) *Config {
+func NewConfig(cwd string, task string) *Config {
 	// organize out env vars
 
 	return &Config{
@@ -30,6 +30,7 @@ func NewConfig(cwd string) *Config {
 		Env:         Env(),
 		Args:        os.Args,
 		Parallelism: DefaultParallelism,
+		Task:        task,
 	}
 }
 
