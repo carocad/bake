@@ -15,15 +15,15 @@ import (
 )
 
 type Data struct {
-	AddressBlock
+	addressBlock
 	Command  string `hcl:"command,optional"`
 	StdOut   values.EventualString
 	StdErr   values.EventualString
 	ExitCode values.EventualInt64
 }
 
-func NewData(raw AddressBlock, ctx *hcl.EvalContext) (*Data, hcl.Diagnostics) {
-	data := &Data{AddressBlock: raw}
+func NewData(raw addressBlock, ctx *hcl.EvalContext) (*Data, hcl.Diagnostics) {
+	data := &Data{addressBlock: raw}
 	diagnostics := gohcl.DecodeBody(raw.Block.Body, ctx, data)
 	if diagnostics.HasErrors() {
 		return nil, diagnostics

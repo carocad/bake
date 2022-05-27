@@ -16,7 +16,7 @@ import (
 )
 
 type Task struct { // todo: what is really optional?
-	AddressBlock
+	addressBlock
 	Description string   `hcl:"description,optional"`
 	Command     string   `hcl:"command,optional"`
 	Creates     string   `hcl:"creates,optional"`
@@ -25,8 +25,8 @@ type Task struct { // todo: what is really optional?
 	exitCode    values.EventualInt64
 }
 
-func NewTask(raw AddressBlock, ctx *hcl.EvalContext) (*Task, hcl.Diagnostics) {
-	task := &Task{AddressBlock: raw}
+func NewTask(raw addressBlock, ctx *hcl.EvalContext) (*Task, hcl.Diagnostics) {
+	task := &Task{addressBlock: raw}
 	diagnostics := gohcl.DecodeBody(raw.Block.Body, ctx, task)
 	if diagnostics.HasErrors() {
 		return nil, diagnostics

@@ -9,7 +9,6 @@ import (
 	"os"
 
 	"github.com/hashicorp/hcl/v2"
-	"github.com/hashicorp/hcl/v2/gohcl"
 	"github.com/hashicorp/hcl/v2/hclparse"
 	"github.com/urfave/cli"
 )
@@ -79,13 +78,13 @@ func App(cwd string, log hcl.DiagnosticWriter, addrs []lang.RawAddress) *cli.App
 		},
 	}
 
-	tasks := getPublicTasks(addrs)
+	tasks := lang.GetPublicTasks(addrs)
 	for _, task := range tasks {
 		cmd := cli.Command{
-			Name:  task.name,
-			Usage: task.description,
+			Name:  task.Name,
+			Usage: task.Description,
 			Action: func(c *cli.Context) error {
-				config := state.NewConfig(cwd, task.name)
+				config := state.NewConfig(cwd, task.Name)
 				return run(config, log, addrs)
 			},
 		}
@@ -103,41 +102,4 @@ func run(config *state.Config, log hcl.DiagnosticWriter, addrs []lang.RawAddress
 	}
 
 	return nil
-}
-
-type command struct{ name, description string }
-
-func getPublicTasks(addrs []lang.RawAddress) []command {
-	commands := make([]command, 0)
-	for _, addr := range addrs {
-		if lang.IsKnownPrefix(addr.GetPath()) {
-			continue
-		}
-
-		// can only be task block
-		block, ok := addr.(lang.AddressBlock)
-		if !ok {
-			continue
-		}
-
-		attrs, diags := block.Block.Body.JustAttributes()
-		if diags.HasErrors() {
-			continue
-		}
-
-		attr, ok := attrs[lang.DescripionAttr]
-		if !ok {
-			continue
-		}
-
-		var description string
-		diags = gohcl.DecodeExpression(attr.Expr, nil, &description)
-		if diags.HasErrors() {
-			continue
-		}
-
-		commands = append(commands, command{addr.GetName(), description})
-	}
-
-	return commands
 }
