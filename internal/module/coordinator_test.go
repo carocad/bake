@@ -67,7 +67,7 @@ func TestSerialCoordination(t *testing.T) {
 		data = append(data, fakeAddress{value, preData[:index]})
 	}
 
-	eval := state.NewConfig(".")
+	eval := &state.Config{}
 	coordinator := NewCoordinator(context.TODO(), *eval)
 	start := time.Now()
 	actions, diags := coordinator.Do(data[len(data)-1], data)
@@ -98,7 +98,7 @@ func TestParallelCoordination(t *testing.T) {
 		data = append(data, fakeAddress{value, nil})
 	}
 
-	eval := state.NewConfig(".")
+	eval := &state.Config{}
 	coordinator := NewCoordinator(context.TODO(), *eval)
 	start := time.Now()
 	_, diags := coordinator.Do(data[len(data)-1], data)
@@ -128,7 +128,7 @@ func TestCustomCoordination(t *testing.T) {
 	}}
 
 	addresses := functional.Map(data, func(f fakeAddress) lang.RawAddress { return f })
-	eval := state.NewConfig(".")
+	eval := &state.Config{}
 	coordinator := NewCoordinator(context.TODO(), *eval)
 	start := time.Now()
 	actions, diags := coordinator.Do(data[len(data)-1], addresses)

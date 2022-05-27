@@ -19,7 +19,7 @@ const (
 )
 
 // AllDependencies returns a map of address string to addresses
-func AllDependencies[T lang.Address](task T, addresses []T) (*concurrent.Map[T, []T], hcl.Diagnostics) {
+func AllDependencies[T lang.RawAddress](task T, addresses []T) (*concurrent.Map[T, []T], hcl.Diagnostics) {
 	deps, diags := Dependencies(task, addresses)
 	if diags.HasErrors() {
 		return nil, diags
@@ -41,7 +41,7 @@ func AllDependencies[T lang.Address](task T, addresses []T) (*concurrent.Map[T, 
 // Dependencies sorting according to
 // https://www.wikiwand.com/en/Topological_sorting#/Depth-first_search
 // NOTE: the task itself is the last element of the dependency list
-func Dependencies[T lang.Address](addr T, addresses []T) ([]T, hcl.Diagnostics) {
+func Dependencies[T lang.RawAddress](addr T, addresses []T) ([]T, hcl.Diagnostics) {
 	mapping := map[string]T{}
 	for _, address := range addresses {
 		mapping[lang.AddressToString(address)] = address
@@ -62,7 +62,7 @@ func Dependencies[T lang.Address](addr T, addresses []T) ([]T, hcl.Diagnostics) 
 
 const cyclicalDependency = "cyclical dependency detected"
 
-func visit[T lang.Address](current string, markers map[string]marker, addresses map[string]T) ([]T, hcl.Diagnostics) {
+func visit[T lang.RawAddress](current string, markers map[string]marker, addresses map[string]T) ([]T, hcl.Diagnostics) {
 	mark := markers[current]
 	if mark == permanent {
 		return nil, nil

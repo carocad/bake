@@ -11,7 +11,6 @@ type Address interface {
 	GetName() string
 	GetPath() cty.Path
 	GetFilename() string
-	Dependencies() ([]hcl.Traversal, hcl.Diagnostics)
 }
 
 type Action interface {
@@ -23,6 +22,7 @@ type Action interface {
 
 type RawAddress interface {
 	Address
+	Dependencies() ([]hcl.Traversal, hcl.Diagnostics)
 	Decode(ctx *hcl.EvalContext) ([]Action, hcl.Diagnostics)
 }
 
