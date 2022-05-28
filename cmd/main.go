@@ -4,7 +4,6 @@ import (
 	"bake/internal"
 	"bake/internal/lang"
 	"bake/internal/state"
-	"errors"
 	"fmt"
 	"os"
 
@@ -21,21 +20,24 @@ func main() {
 		os.Exit(1)
 	}
 
-	code := do(cwd)
-	os.Exit(int(code))
+	log, err := do(cwd)
+	// success, stop early
+	if err == nil {
+		os.Exit(0)
+	}
+
+	// did we get a diagnostic?
+	if diags, ok := err.(hcl.Diagnostics); ok {
+		log.WriteDiagnostics(diags)
+		os.Exit(2)
+	}
+
+	// random err
+	fmt.Println(err)
+	os.Exit(3)
 }
 
-type ExitCode int
-
-// Exit codes
-const (
-	OK ExitCode = iota
-	ErrPanic
-	ErrReadingFiles
-	ErrTaskCrash
-)
-
-func do(cwd string) ExitCode {
+func do(cwd string) (hcl.DiagnosticWriter, error) {
 	// create a parser
 	parser := hclparse.NewParser()
 	// logger for diagnostics
@@ -43,23 +45,34 @@ func do(cwd string) ExitCode {
 
 	addrs, diags := internal.ReadRecipes(cwd, parser)
 	if diags.HasErrors() {
-		log.WriteDiagnostics(diags)
-		return ErrReadingFiles
+		return log, diags
 	}
 
 	err := App(cwd, log, addrs).Run(os.Args)
 	if err != nil {
-		return ErrTaskCrash
+		return log, err
 	}
 
-	return OK
+	return log, nil
 }
 
 const (
 	DryRun = "dry-run"
-	List   = "list"
 	Prune  = "prune"
 	// Watch  = "watch" TODO
+)
+
+var foo = "2"
+
+var (
+	PruneFlag = cli.BoolFlag{
+		Name:  Prune,
+		Usage: "Remove all files created by the current recipes",
+	}
+	DryRunFlag = cli.BoolFlag{
+		Name:  DryRun,
+		Usage: "Don't actually run any recipe; just print them",
+	}
 )
 
 func App(cwd string, log hcl.DiagnosticWriter, addrs []lang.RawAddress) *cli.App {
@@ -67,39 +80,32 @@ func App(cwd string, log hcl.DiagnosticWriter, addrs []lang.RawAddress) *cli.App
 		Name:  "bake",
 		Usage: "Build task orchestration",
 		Flags: []cli.Flag{
-			&cli.BoolFlag{
-				Name:  List,
-				Usage: "List all public tasks",
-			},
-			&cli.BoolFlag{
-				Name:  Prune,
-				Usage: "Remove all files created by the current recipes",
-			},
+			PruneFlag,
 		},
 	}
 
 	tasks := lang.GetPublicTasks(addrs)
 	for _, task := range tasks {
+		task := task
 		cmd := cli.Command{
 			Name:  task.Name,
 			Usage: task.Description,
+			Flags: []cli.Flag{
+				PruneFlag,
+				DryRunFlag,
+			},
 			Action: func(c *cli.Context) error {
 				config := state.NewConfig(cwd, task.Name)
-				return run(config, log, addrs)
+				diags := internal.Do(config, addrs)
+				if diags.HasErrors() {
+					return diags
+				}
+
+				return nil
 			},
 		}
 		app.Commands = append(app.Commands, cmd)
 	}
 
 	return app
-}
-
-func run(config *state.Config, log hcl.DiagnosticWriter, addrs []lang.RawAddress) error {
-	diags := internal.Do(config, addrs)
-	if diags.HasErrors() {
-		log.WriteDiagnostics(diags)
-		return errors.New(diags.Error())
-	}
-
-	return nil
 }
