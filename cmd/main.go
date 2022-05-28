@@ -48,7 +48,7 @@ func do(cwd string) (hcl.DiagnosticWriter, error) {
 		return log, diags
 	}
 
-	err := App(cwd, log, addrs).Run(os.Args)
+	err := App(cwd, addrs).Run(os.Args)
 	if err != nil {
 		return log, err
 	}
@@ -62,8 +62,6 @@ const (
 	// Watch  = "watch" TODO
 )
 
-var foo = "2"
-
 var (
 	PruneFlag = cli.BoolFlag{
 		Name:  Prune,
@@ -75,10 +73,17 @@ var (
 	}
 )
 
-func App(cwd string, log hcl.DiagnosticWriter, addrs []lang.RawAddress) *cli.App {
+func App(cwd string, addrs []lang.RawAddress) *cli.App {
+	usage := "Build task orchestration. "
+	if len(addrs) > 0 {
+		usage += `
+		
+		NOTE: The "commands" below are the public tasks from the current recipes.`
+	}
+
 	app := &cli.App{
 		Name:  "bake",
-		Usage: "Build task orchestration",
+		Usage: usage,
 		Flags: []cli.Flag{
 			PruneFlag,
 		},
@@ -96,6 +101,9 @@ func App(cwd string, log hcl.DiagnosticWriter, addrs []lang.RawAddress) *cli.App
 			},
 			Action: func(c *cli.Context) error {
 				config := state.NewConfig(cwd, task.Name)
+				config.DryRun = c.Bool(DryRun)
+
+				// todo: handle prune flag
 				diags := internal.Do(config, addrs)
 				if diags.HasErrors() {
 					return diags

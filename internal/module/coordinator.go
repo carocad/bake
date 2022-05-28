@@ -118,11 +118,6 @@ func (coordinator *Coordinator) Do(task lang.RawAddress, addresses []lang.RawAdd
 		}
 
 		coordinator.actions.Extend(actions)
-		// on dryRun we only apply the data refreshing
-		if coordinator.eval.DryRun && !address.GetPath().HasPrefix(lang.DataPrefix) {
-			return nil, nil
-		}
-
 		for _, action := range actions {
 			shouldRun, description, diags := action.Plan()
 			if diags.HasErrors() {
@@ -132,6 +127,11 @@ func (coordinator *Coordinator) Do(task lang.RawAddress, addresses []lang.RawAdd
 			logger := log.New(os.Stdout, lang.PathString(action.GetPath())+": ", 0)
 			logger.Println(fmt.Sprintf(`%s`, description))
 			if !shouldRun {
+				continue
+			}
+
+			// on dryRun we only apply the data refreshing
+			if coordinator.eval.DryRun && !address.GetPath().HasPrefix(lang.DataPrefix) {
 				continue
 			}
 
