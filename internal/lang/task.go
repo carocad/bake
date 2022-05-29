@@ -47,7 +47,7 @@ func (t Task) CTY() cty.Value {
 	return cty.ObjectVal(m)
 }
 
-func (t Task) Plan() (shouldApply bool, reason string, diags hcl.Diagnostics) {
+func (t Task) Plan(state State) (shouldApply bool, reason string, diags hcl.Diagnostics) {
 	// phony task
 	if len(t.Sources) == 0 || t.Creates == "" {
 		return true, `"sources" or "creates" was not specified ... baking phony task`, nil
@@ -98,8 +98,8 @@ func (t Task) Plan() (shouldApply bool, reason string, diags hcl.Diagnostics) {
 	return false, fmt.Sprintf(`no source matching "%s" is newer than "%s" ... skipping`, strings.Join(t.Sources, ""), t.Creates), nil
 }
 
-func (t *Task) Apply() hcl.Diagnostics {
-	if t.exitCode.Valid {
+func (t *Task) Apply(state State) hcl.Diagnostics {
+	if t.exitCode.Valid || state.DryRun {
 		return nil
 	}
 

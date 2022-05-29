@@ -3,7 +3,6 @@ package module
 import (
 	"bake/internal/functional"
 	"bake/internal/lang"
-	"bake/internal/state"
 	"context"
 	"fmt"
 	"math"
@@ -50,11 +49,11 @@ func (s fakeAddress) CTY() cty.Value {
 	return cty.StringVal(s.name)
 }
 
-func (s fakeAddress) Plan() (bool, string, hcl.Diagnostics) {
+func (s fakeAddress) Plan(state lang.State) (bool, string, hcl.Diagnostics) {
 	return true, fmt.Sprintf(`refreshing "%s"`, lang.PathString(s.GetPath())), nil
 }
 
-func (s fakeAddress) Apply() hcl.Diagnostics {
+func (s fakeAddress) Apply(state lang.State) hcl.Diagnostics {
 	time.Sleep(200 * time.Millisecond)
 	return nil
 }
@@ -67,7 +66,7 @@ func TestSerialCoordination(t *testing.T) {
 		data = append(data, fakeAddress{value, preData[:index]})
 	}
 
-	eval := state.NewConfig(".", "1")
+	eval := lang.NewState(".", "1")
 	coordinator := NewCoordinator(context.TODO(), *eval)
 	start := time.Now()
 	actions, diags := coordinator.Do(data[len(data)-1], data)
@@ -98,7 +97,7 @@ func TestParallelCoordination(t *testing.T) {
 		data = append(data, fakeAddress{value, nil})
 	}
 
-	eval := state.NewConfig(".", "1")
+	eval := lang.NewState(".", "1")
 	coordinator := NewCoordinator(context.TODO(), *eval)
 	start := time.Now()
 	_, diags := coordinator.Do(data[len(data)-1], data)
@@ -128,7 +127,7 @@ func TestCustomCoordination(t *testing.T) {
 	}}
 
 	addresses := functional.Map(data, func(f fakeAddress) lang.RawAddress { return f })
-	eval := state.NewConfig(".", "5")
+	eval := lang.NewState(".", "5")
 	coordinator := NewCoordinator(context.TODO(), *eval)
 	start := time.Now()
 	actions, diags := coordinator.Do(data[len(data)-1], addresses)

@@ -39,12 +39,12 @@ func (d Data) CTY() cty.Value {
 	return cty.ObjectVal(m)
 }
 
-func (d Data) Plan() (bool, string, hcl.Diagnostics) {
+func (d Data) Plan(state State) (bool, string, hcl.Diagnostics) {
 	return true, `refreshing ...`, nil
 }
 
-func (d *Data) Apply() hcl.Diagnostics {
-	if d.ExitCode.Valid {
+func (d *Data) Apply(state State) hcl.Diagnostics {
+	if d.ExitCode.Valid { // apply data even on dry run
 		return nil
 	}
 

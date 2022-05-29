@@ -3,7 +3,6 @@ package main
 import (
 	"bake/internal"
 	"bake/internal/lang"
-	"bake/internal/state"
 	"fmt"
 	"os"
 
@@ -100,11 +99,12 @@ func App(cwd string, addrs []lang.RawAddress) *cli.App {
 				DryRunFlag,
 			},
 			Action: func(c *cli.Context) error {
-				config := state.NewConfig(cwd, task.Name)
-				config.DryRun = c.Bool(DryRun)
+				state := lang.NewState(cwd, task.Name)
+				state.DryRun = c.Bool(DryRun)
+				state.Prune = c.Bool(Prune)
 
 				// todo: handle prune flag
-				diags := internal.Do(config, addrs)
+				diags := internal.Do(state, addrs)
 				if diags.HasErrors() {
 					return diags
 				}

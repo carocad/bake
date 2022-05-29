@@ -4,7 +4,6 @@ import (
 	"bake/internal/concurrent"
 	"bake/internal/lang"
 	"bake/internal/module/topo"
-	"bake/internal/state"
 	"context"
 	"fmt"
 	"log"
@@ -72,10 +71,10 @@ type Coordinator struct {
 	pool    *errgroup.Group
 	waiting *concurrent.Map[lang.Address, *sync.WaitGroup]
 	actions *concurrent.Slice[lang.Action]
-	eval    state.Config
+	state   lang.State
 }
 
-func NewCoordinator(ctx context.Context, eval state.Config) Coordinator {
+func NewCoordinator(ctx context.Context, eval lang.State) Coordinator {
 	// todo: do I need to return the context?
 	bounded, _ := errgroup.WithContext(ctx)
 	bounded.SetLimit(int(eval.Parallelism))
@@ -83,7 +82,7 @@ func NewCoordinator(ctx context.Context, eval state.Config) Coordinator {
 		pool:    bounded,
 		waiting: concurrent.NewMapBy[lang.Address, *sync.WaitGroup](lang.AddressToString[lang.Address]),
 		actions: concurrent.NewSlice[lang.Action](),
-		eval:    eval,
+		state:   eval,
 	}
 }
 
@@ -111,7 +110,7 @@ func (coordinator *Coordinator) Do(task lang.RawAddress, addresses []lang.RawAdd
 			return nil, diags
 		}
 
-		evalContext := coordinator.eval.Context(address, coordinator.actions.Items())
+		evalContext := coordinator.state.Context(address, coordinator.actions.Items())
 		actions, diags := address.Decode(evalContext)
 		if diags.HasErrors() {
 			return nil, diags
@@ -119,7 +118,7 @@ func (coordinator *Coordinator) Do(task lang.RawAddress, addresses []lang.RawAdd
 
 		coordinator.actions.Extend(actions)
 		for _, action := range actions {
-			shouldRun, description, diags := action.Plan()
+			shouldRun, description, diags := action.Plan(coordinator.state)
 			if diags.HasErrors() {
 				return nil, diags
 			}
@@ -127,11 +126,6 @@ func (coordinator *Coordinator) Do(task lang.RawAddress, addresses []lang.RawAdd
 			logger := log.New(os.Stdout, lang.PathString(action.GetPath())+": ", 0)
 			logger.Println(fmt.Sprintf(`%s`, description))
 			if !shouldRun {
-				continue
-			}
-
-			// on dryRun we only apply the data refreshing
-			if coordinator.eval.DryRun && !address.GetPath().HasPrefix(lang.DataPrefix) {
 				continue
 			}
 
@@ -144,7 +138,7 @@ func (coordinator *Coordinator) Do(task lang.RawAddress, addresses []lang.RawAdd
 			coordinator.pool.Go(func() error {
 				defer promise.Done()
 
-				diags := action.Apply()
+				diags := action.Apply(coordinator.state)
 				// todo: display the time it took to apply the action
 				if diags.HasErrors() {
 					return diags

@@ -1,7 +1,6 @@
-package state
+package lang
 
 import (
-	"bake/internal/lang"
 	"os"
 	"path/filepath"
 	"strings"
@@ -10,22 +9,23 @@ import (
 	"github.com/zclconf/go-cty/cty"
 )
 
-type Config struct {
+type State struct {
 	CWD string
 	// Context     context.Context TODO
 	Env         map[string]string
 	Args        []string
-	DryRun      bool // todo: try to generalize this
+	DryRun      bool
+	Prune       bool
 	Parallelism uint8
 	Task        string
 }
 
 const DefaultParallelism = 4
 
-func NewConfig(cwd string, task string) *Config {
+func NewState(cwd string, task string) *State {
 	// organize out env vars
 
-	return &Config{
+	return &State{
 		CWD:         cwd,
 		Env:         Env(),
 		Args:        os.Args,
@@ -46,12 +46,12 @@ func Env() map[string]string {
 	return env
 }
 
-func (ctx Config) Context(addr lang.RawAddress, actions []lang.Action) *hcl.EvalContext {
+func (state State) Context(addr RawAddress, actions []Action) *hcl.EvalContext {
 	variables := map[string]cty.Value{
 		"path": cty.ObjectVal(map[string]cty.Value{
-			"root":    cty.StringVal(ctx.CWD),
-			"module":  cty.StringVal(filepath.Join(ctx.CWD, filepath.Dir(addr.GetFilename()))),
-			"current": cty.StringVal(filepath.Join(ctx.CWD, addr.GetFilename())),
+			"root":    cty.StringVal(state.CWD),
+			"module":  cty.StringVal(filepath.Join(state.CWD, filepath.Dir(addr.GetFilename()))),
+			"current": cty.StringVal(filepath.Join(state.CWD, addr.GetFilename())),
 		}),
 	}
 
@@ -62,9 +62,9 @@ func (ctx Config) Context(addr lang.RawAddress, actions []lang.Action) *hcl.Eval
 		path := act.GetPath()
 		value := act.CTY()
 		switch {
-		case path.HasPrefix(lang.DataPrefix):
+		case path.HasPrefix(DataPrefix):
 			data[name] = value
-		case path.HasPrefix(lang.LocalPrefix):
+		case path.HasPrefix(LocalPrefix):
 			local[name] = value
 		default:
 			// only targets for now !!
@@ -72,10 +72,10 @@ func (ctx Config) Context(addr lang.RawAddress, actions []lang.Action) *hcl.Eval
 		}
 	}
 
-	variables[lang.DataLabel] = cty.ObjectVal(data)
-	variables[lang.LocalScope] = cty.ObjectVal(local)
+	variables[DataLabel] = cty.ObjectVal(data)
+	variables[LocalScope] = cty.ObjectVal(local)
 	return &hcl.EvalContext{
 		Variables: variables,
-		Functions: lang.Functions(),
+		Functions: Functions(),
 	}
 }

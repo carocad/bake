@@ -7,7 +7,6 @@ import (
 
 	"bake/internal/lang"
 	"bake/internal/module"
-	"bake/internal/state"
 
 	"github.com/hashicorp/hcl/v2"
 	"github.com/hashicorp/hcl/v2/hclparse"
@@ -52,7 +51,7 @@ func ReadRecipes(cwd string, parser *hclparse.Parser) ([]lang.RawAddress, hcl.Di
 	return addresses, nil
 }
 
-func Do(config *state.Config, addrs []lang.RawAddress) hcl.Diagnostics {
+func Do(config *lang.State, addrs []lang.RawAddress) hcl.Diagnostics {
 	task, diags := module.GetTask(config.Task, addrs)
 	if diags.HasErrors() {
 		return diags
