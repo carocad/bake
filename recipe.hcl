@@ -36,7 +36,7 @@ task "test" {
   depends_on = [libraries]
 }
 
-task version {
+task "version" {
   creates = local.version_filename
   sources = [local.go_sources]
   command = <<COMMAND
@@ -53,7 +53,7 @@ EOF
 COMMAND
 }
 
-task libraries {
+task "libraries" {
   creates = "go.sum"
   sources = ["go.mod"]
   command = "go mod download"

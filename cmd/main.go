@@ -73,13 +73,10 @@ var (
 )
 
 func App(cwd string, addrs []lang.RawAddress) *cli.App {
-	usage := "Build task orchestration. "
-	if len(addrs) > 0 {
-		usage += `
+	tasks := lang.GetPublicTasks(addrs)
+	usage := `Build task orchestration. 
 		
-		NOTE: The "commands" below are the public tasks from the current recipes.`
-	}
-
+		NOTE: The "commands" below only contain task which have a description.`
 	app := &cli.App{
 		Name:  "bake",
 		Usage: usage,
@@ -87,8 +84,6 @@ func App(cwd string, addrs []lang.RawAddress) *cli.App {
 			PruneFlag,
 		},
 	}
-
-	tasks := lang.GetPublicTasks(addrs)
 	for _, task := range tasks {
 		task := task
 		cmd := cli.Command{
