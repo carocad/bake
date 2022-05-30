@@ -3,6 +3,7 @@ package lang
 import (
 	"bytes"
 	"fmt"
+	"log"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -47,7 +48,7 @@ func (t Task) CTY() cty.Value {
 	return cty.ObjectVal(m)
 }
 
-func (t Task) Plan(state State) (shouldApply bool, reason string, diags hcl.Diagnostics) {
+func (t Task) plan(state State) (shouldApply bool, reason string, diags hcl.Diagnostics) {
 	// phony task
 	if len(t.Sources) == 0 || t.Creates == "" {
 		return true, `"sources" or "creates" was not specified ... baking phony task`, nil
@@ -99,29 +100,51 @@ func (t Task) Plan(state State) (shouldApply bool, reason string, diags hcl.Diag
 }
 
 func (t *Task) Apply(state State) hcl.Diagnostics {
-	if t.exitCode.Valid || state.DryRun {
+	// dont apply twice in case more than 1 task depends on this
+	if t.exitCode.Valid {
 		return nil
 	}
 
-	// log.Println("executing " + PathString(t.GetPath()))
+	log := state.NewLogger(t)
+	if t.Command == "" {
+		log.Println("all dependencies are done")
+		return nil
+	}
 
+	shouldRun, description, diags := t.plan(state)
+	if diags.HasErrors() {
+		return diags
+	}
+
+	log.Println(description)
+	if !shouldRun || state.DryRun {
+		return nil
+	}
+
+	return t.run(log)
+}
+
+func (t *Task) run(log *log.Logger) hcl.Diagnostics {
+	// determine which shell to use
 	terminal := "bash"
 	shell, ok := os.LookupEnv("SHELL")
 	if ok {
 		terminal = shell
 	}
 
+	// use fail fast flags
 	script := fmt.Sprintf(`
 	set -euo pipefail
 
 	%s`, t.Command)
 	command := exec.Command(terminal, "-c", script)
+	// todo: should this be configurable?
 	var stdout, stderr bytes.Buffer
 	command.Stdout = &stdout
 	command.Stderr = &stderr
 	err := command.Run()
-	// todo: keep a ref to command.ProcessState since it contains useful info
-	// like process time, exit code, etc
+
+	// store results
 	t.exitCode = values.EventualInt64{
 		Int64: int64(command.ProcessState.ExitCode()),
 		Valid: true,
@@ -142,5 +165,6 @@ func (t *Task) Apply(state State) hcl.Diagnostics {
 		}}
 	}
 
+	log.Println(`done in ` + command.ProcessState.UserTime().String())
 	return nil
 }

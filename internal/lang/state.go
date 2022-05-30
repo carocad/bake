@@ -1,6 +1,7 @@
 package lang
 
 import (
+	"log"
 	"os"
 	"path/filepath"
 	"strings"
@@ -78,4 +79,10 @@ func (state State) Context(addr RawAddress, actions []Action) *hcl.EvalContext {
 		Variables: variables,
 		Functions: Functions(),
 	}
+}
+
+func (state State) NewLogger(addr Address) *log.Logger {
+	prefix := PathString(addr.GetPath())
+	// todo: change stdout according to state
+	return log.New(os.Stdout, prefix+": ", 0)
 }

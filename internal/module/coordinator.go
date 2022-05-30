@@ -6,8 +6,6 @@ import (
 	"bake/internal/module/topo"
 	"context"
 	"fmt"
-	"log"
-	"os"
 	"sync"
 
 	"github.com/hashicorp/hcl/v2"
@@ -118,17 +116,6 @@ func (coordinator *Coordinator) Do(task lang.RawAddress, addresses []lang.RawAdd
 
 		coordinator.actions.Extend(actions)
 		for _, action := range actions {
-			shouldRun, description, diags := action.Plan(coordinator.state)
-			if diags.HasErrors() {
-				return nil, diags
-			}
-
-			logger := log.New(os.Stdout, lang.PathString(action.GetPath())+": ", 0)
-			logger.Println(fmt.Sprintf(`%s`, description))
-			if !shouldRun {
-				continue
-			}
-
 			promise.Add(1)
 			// keep a reference to the original value due to closure and goroutine
 			// https://golang.org/doc/faq#closures_and_goroutines

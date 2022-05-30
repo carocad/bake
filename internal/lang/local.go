@@ -53,7 +53,3 @@ func (l Local) Apply(state State) hcl.Diagnostics {
 func (l Local) CTY() cty.Value {
 	return l.value
 }
-
-func (l Local) Plan(state State) (bool, string, hcl.Diagnostics) {
-	return true, `refreshing ...`, nil
-}

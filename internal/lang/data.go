@@ -39,32 +39,32 @@ func (d Data) CTY() cty.Value {
 	return cty.ObjectVal(m)
 }
 
-func (d Data) Plan(state State) (bool, string, hcl.Diagnostics) {
-	return true, `refreshing ...`, nil
-}
-
 func (d *Data) Apply(state State) hcl.Diagnostics {
 	if d.ExitCode.Valid { // apply data even on dry run
 		return nil
 	}
 
-	// log.Println("refreshing " + PathString(d.GetPath()))
-
+	log := state.NewLogger(d)
+	log.Println(`refreshing ...`)
+	// which shell should I use?
 	terminal := "bash"
 	shell, ok := os.LookupEnv("SHELL")
 	if ok {
 		terminal = shell
 	}
 
+	// use shell with fail fast flags
 	script := fmt.Sprintf(`
 	set -euo pipefail
 
 	%s`, d.Command)
 	command := exec.Command(terminal, "-c", script)
+	// todo: should I allow configuring these?
 	var stdout, stderr bytes.Buffer
 	command.Stdout = &stdout
 	command.Stderr = &stderr
 	err := command.Run()
+	// store results
 	d.StdOut = values.EventualString{
 		String: strings.TrimSpace(stdout.String()),
 		Valid:  true,
@@ -75,8 +75,6 @@ func (d *Data) Apply(state State) hcl.Diagnostics {
 		Valid:  true,
 	}
 
-	// todo: keep a ref to command.ProcessState since it contains useful info
-	// like process time, exit code, etc
 	d.ExitCode = values.EventualInt64{
 		Int64: int64(command.ProcessState.ExitCode()),
 		Valid: true,
@@ -97,5 +95,6 @@ func (d *Data) Apply(state State) hcl.Diagnostics {
 		}}
 	}
 
+	log.Println(`done in ` + command.ProcessState.UserTime().String())
 	return nil
 }
