@@ -9,7 +9,6 @@ locals {
 }
 
 task "main" {
-  command = "echo 'I did it :)'"
   description = "the default task to run"
 
   depends_on = [vet, compile, test]

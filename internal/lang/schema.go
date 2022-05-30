@@ -24,6 +24,7 @@ const (
 const (
 	DependsOnAttr  = "depends_on"
 	CommandAttr    = "command"
+	CreatesAttr    = "creates"
 	SourcesAttr    = "sources"
 	DescripionAttr = "description"
 	ForEachAttr    = "for_each" // todo

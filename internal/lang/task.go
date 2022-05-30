@@ -49,6 +49,20 @@ func (t Task) CTY() cty.Value {
 }
 
 func (t Task) plan(state State) (shouldApply bool, reason string, diags hcl.Diagnostics) {
+	if t.Command == "" && t.Creates != "" {
+		return false, "", hcl.Diagnostics{{
+			Severity: hcl.DiagError,
+			Summary:  `"command" cannot be empty when "creates" is provided`,
+			Subject:  GetRangeFor(t.Block, t.Creates),
+			Context:  t.Block.DefRange.Ptr(),
+		}}
+	}
+
+	// alias task
+	if t.Command == "" {
+		return false, "all dependencies are done", nil
+	}
+
 	// phony task
 	if len(t.Sources) == 0 || t.Creates == "" {
 		return true, `"sources" or "creates" was not specified ... baking phony task`, nil
@@ -106,11 +120,6 @@ func (t *Task) Apply(state State) hcl.Diagnostics {
 	}
 
 	log := state.NewLogger(t)
-	if t.Command == "" {
-		log.Println("all dependencies are done")
-		return nil
-	}
-
 	shouldRun, description, diags := t.plan(state)
 	if diags.HasErrors() {
 		return diags
@@ -137,6 +146,7 @@ func (t *Task) run(log *log.Logger) hcl.Diagnostics {
 	set -euo pipefail
 
 	%s`, t.Command)
+	// todo: use exec.CommandContext
 	command := exec.Command(terminal, "-c", script)
 	// todo: should this be configurable?
 	var stdout, stderr bytes.Buffer

@@ -7,10 +7,9 @@ import (
 )
 
 type Promise[T any] struct {
-	IsValid bool
-	Error   error
-	Value   T
-	wg      *sync.WaitGroup
+	Error error
+	Value T
+	wg    *sync.WaitGroup
 }
 
 func NewPromise[T any](effect func() (T, error)) *Promise[T] {
@@ -25,7 +24,6 @@ func NewPromiseGroup[T any](group *errgroup.Group, effect func() (T, error)) *Pr
 		defer promise.wg.Done()
 
 		value, err := effect()
-		promise.IsValid = true
 		if err != nil {
 			promise.Error = err
 			return err
