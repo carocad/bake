@@ -13,7 +13,7 @@ func GetRangeFor(block *hcl.Block, name string) *hcl.Range {
 	}
 
 	for _, attribute := range attributes {
-		if attribute.Name == CommandAttr {
+		if attribute.Name == name {
 			return attribute.Expr.Range().Ptr()
 		}
 	}

@@ -53,7 +53,7 @@ func (t Task) plan(state State) (shouldApply bool, reason string, diags hcl.Diag
 		return false, "", hcl.Diagnostics{{
 			Severity: hcl.DiagError,
 			Summary:  `"command" cannot be empty when "creates" is provided`,
-			Subject:  GetRangeFor(t.Block, t.Creates),
+			Subject:  GetRangeFor(t.Block, CreatesAttr),
 			Context:  t.Block.DefRange.Ptr(),
 		}}
 	}
@@ -176,5 +176,20 @@ func (t *Task) run(log *log.Logger) hcl.Diagnostics {
 	}
 
 	log.Println(`done in ` + command.ProcessState.UserTime().String())
+
+	if t.Creates == "" {
+		return nil
+	}
+
+	_, err = os.Stat(t.Creates)
+	if err != nil {
+		return hcl.Diagnostics{{
+			Severity: hcl.DiagError,
+			Summary:  fmt.Sprintf(`"%s" didn't create the expected file "%s"`, PathString(t.GetPath()), t.Creates),
+			Subject:  GetRangeFor(t.Block, CreatesAttr),
+			Context:  &t.Block.TypeRange,
+		}}
+	}
+
 	return nil
 }
