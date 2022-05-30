@@ -16,7 +16,7 @@ import (
 	"github.com/zclconf/go-cty/cty"
 )
 
-type Task struct { // todo: what is really optional?
+type Task struct {
 	addressBlock
 	Description string   `hcl:"description,optional"`
 	Command     string   `hcl:"command,optional"`

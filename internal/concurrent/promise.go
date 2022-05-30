@@ -43,21 +43,20 @@ func (promise *Promise[T]) Wait() (T, error) {
 	return promise.Value, promise.Error
 }
 
-func PromiseAll[T any](promises ...*Promise[T]) *Promise[[]T] {
-	return PromiseAllGroup(&errgroup.Group{}, promises...)
+func WaitFor[T any](promises ...*Promise[T]) ([]T, error) {
+	return WaitForGroup(&errgroup.Group{}, promises...)
 }
 
-func PromiseAllGroup[T any](group *errgroup.Group, promises ...*Promise[T]) *Promise[[]T] {
-	return NewPromiseGroup(group, func() ([]T, error) {
-		result := make([]T, len(promises))
-		for _, p := range promises {
-			v, err := p.Wait()
-			if err != nil {
-				return nil, err
-			}
-
-			result = append(result, v)
+func WaitForGroup[T any](group *errgroup.Group, promises ...*Promise[T]) ([]T, error) {
+	result := make([]T, len(promises))
+	for _, p := range promises {
+		v, err := p.Wait()
+		if err != nil {
+			return nil, err
 		}
-		return result, nil
-	})
+
+		result = append(result, v)
+	}
+
+	return result, nil
 }
