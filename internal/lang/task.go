@@ -96,7 +96,7 @@ func (t Task) plan(state State) (shouldApply bool, reason string, diags hcl.Diag
 		}
 	}
 
-	return false, fmt.Sprintf(`no source matching "%s" is newer than "%s" ... skipping`, strings.Join(t.Sources, ""), t.Creates), nil
+	return false, fmt.Sprintf(`"%s" is newer than "%s" ... skipping`, t.Creates, strings.Join(t.Sources, "")), nil
 }
 
 func (t *Task) Apply(state State) hcl.Diagnostics {

@@ -20,7 +20,7 @@ task "compile" {
   command  = "go build -o ${local.binary} ${local.main}"
   sources  = [local.go_sources]
 
-  depends_on = [version]
+  depends_on = [version, libraries]
 }
 
 task "vet" {
@@ -33,6 +33,8 @@ task "test" {
   command = "go test -timeout 30s ./... | tee ${local.test_report}"
   creates = local.test_report
   sources  = [local.go_sources]
+
+  depends_on = [libraries]
 }
 
 task version {
@@ -50,4 +52,10 @@ const (
 )
 EOF
 COMMAND
+}
+
+task libraries {
+  creates = "go.sum"
+  sources = ["go.mod"]
+  command = "go mod download"
 }
