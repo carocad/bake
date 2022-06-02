@@ -48,7 +48,27 @@ func (t Task) CTY() cty.Value {
 	return cty.ObjectVal(m)
 }
 
-func (t Task) plan(state State) (shouldApply bool, reason string, diags hcl.Diagnostics) {
+func (t *Task) Apply(state State) hcl.Diagnostics {
+	// dont apply twice in case more than 1 task depends on this
+	if t.exitCode.Valid || t.Command == "" {
+		return nil
+	}
+
+	log := state.NewLogger(t)
+	shouldRun, description, diags := t.dryRun(state)
+	if diags.HasErrors() {
+		return diags
+	}
+
+	log.Println(description)
+	if !shouldRun || state.DryRun {
+		return nil
+	}
+
+	return t.run(log)
+}
+
+func (t Task) dryRun(state State) (shouldApply bool, reason string, diags hcl.Diagnostics) {
 	if t.Command == "" && t.Creates != "" {
 		return false, "", hcl.Diagnostics{{
 			Severity: hcl.DiagError,
@@ -56,11 +76,6 @@ func (t Task) plan(state State) (shouldApply bool, reason string, diags hcl.Diag
 			Subject:  GetRangeFor(t.Block, CreatesAttr),
 			Context:  t.Block.DefRange.Ptr(),
 		}}
-	}
-
-	// alias task
-	if t.Command == "" {
-		return false, "all dependencies are done", nil
 	}
 
 	// phony task
@@ -113,26 +128,6 @@ func (t Task) plan(state State) (shouldApply bool, reason string, diags hcl.Diag
 	return false, fmt.Sprintf(`"%s" is newer than "%s" ... skipping`, t.Creates, strings.Join(t.Sources, "")), nil
 }
 
-func (t *Task) Apply(state State) hcl.Diagnostics {
-	// dont apply twice in case more than 1 task depends on this
-	if t.exitCode.Valid {
-		return nil
-	}
-
-	log := state.NewLogger(t)
-	shouldRun, description, diags := t.plan(state)
-	if diags.HasErrors() {
-		return diags
-	}
-
-	log.Println(description)
-	if !shouldRun || state.DryRun {
-		return nil
-	}
-
-	return t.run(log)
-}
-
 func (t *Task) run(log *log.Logger) hcl.Diagnostics {
 	// determine which shell to use
 	terminal := "bash"
@@ -153,7 +148,7 @@ func (t *Task) run(log *log.Logger) hcl.Diagnostics {
 	command.Stdout = &stdout
 	command.Stderr = &stderr
 	err := command.Run()
-
+	log.Println(`done in ` + command.ProcessState.UserTime().String())
 	// store results
 	t.exitCode = values.EventualInt64{
 		Int64: int64(command.ProcessState.ExitCode()),
@@ -174,8 +169,6 @@ func (t *Task) run(log *log.Logger) hcl.Diagnostics {
 			Context:  t.Block.DefRange.Ptr(),
 		}}
 	}
-
-	log.Println(`done in ` + command.ProcessState.UserTime().String())
 
 	if t.Creates == "" {
 		return nil

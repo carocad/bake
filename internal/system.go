@@ -4,6 +4,7 @@ import (
 	"context"
 	"io/ioutil"
 	"path/filepath"
+	"time"
 
 	"bake/internal/lang"
 	"bake/internal/module"
@@ -58,7 +59,11 @@ func Do(config *lang.State, addrs []lang.RawAddress) hcl.Diagnostics {
 	}
 
 	coordinator := module.NewCoordinator(context.TODO(), *config)
+	log := config.NewLogger(task)
+	start := time.Now()
 	_, diags = coordinator.Do(task, addrs)
+	end := time.Now()
+	log.Printf(`done in %s`, end.Sub(start).String())
 	if diags.HasErrors() {
 		return diags
 	}
