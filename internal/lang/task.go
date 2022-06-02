@@ -55,13 +55,28 @@ func (t *Task) Apply(state State) hcl.Diagnostics {
 	}
 
 	log := state.NewLogger(t)
+	if state.Prune {
+		shouldRun, description, diags := t.dryPrune(state)
+		if diags.HasErrors() {
+			return diags
+		}
+
+		log.Println(description)
+		if !shouldRun || state.Dry {
+			return nil
+		}
+
+		return t.prune(log)
+	}
+
+	// run
 	shouldRun, description, diags := t.dryRun(state)
 	if diags.HasErrors() {
 		return diags
 	}
 
 	log.Println(description)
-	if !shouldRun || state.DryRun {
+	if !shouldRun || state.Dry {
 		return nil
 	}
 
@@ -179,6 +194,34 @@ func (t *Task) run(log *log.Logger) hcl.Diagnostics {
 		return hcl.Diagnostics{{
 			Severity: hcl.DiagError,
 			Summary:  fmt.Sprintf(`"%s" didn't create the expected file "%s"`, PathString(t.GetPath()), t.Creates),
+			Subject:  GetRangeFor(t.Block, CreatesAttr),
+			Context:  &t.Block.TypeRange,
+		}}
+	}
+
+	return nil
+}
+
+func (t Task) dryPrune(state State) (shouldApply bool, reason string, diags hcl.Diagnostics) {
+	if t.Creates == "" {
+		return false, "nothing to prune", nil
+	}
+
+	stat, err := os.Stat(t.Creates)
+	if err != nil {
+		return false, fmt.Sprintf(`"%s" doesn't exist`, t.Creates), nil
+	}
+
+	return true, fmt.Sprintf(`will delete "%s"`, stat.Name()), nil
+}
+
+func (t *Task) prune(log *log.Logger) hcl.Diagnostics {
+	err := os.RemoveAll(t.Creates)
+	if err != nil {
+		return hcl.Diagnostics{{
+			Severity: hcl.DiagError,
+			Summary:  "error pruning task " + t.GetName(),
+			Detail:   err.Error(),
 			Subject:  GetRangeFor(t.Block, CreatesAttr),
 			Context:  &t.Block.TypeRange,
 		}}

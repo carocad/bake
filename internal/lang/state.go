@@ -15,7 +15,7 @@ type State struct {
 	// Context     context.Context TODO
 	Env         map[string]string
 	Args        []string
-	DryRun      bool
+	Dry         bool
 	Prune       bool
 	Parallelism uint8
 	Task        string

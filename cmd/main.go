@@ -56,8 +56,8 @@ func do(cwd string) (hcl.DiagnosticWriter, error) {
 }
 
 const (
-	DryRun = "dry-run"
-	Prune  = "prune"
+	Dry   = "dry"
+	Prune = "prune"
 	// Watch  = "watch" TODO
 )
 
@@ -66,8 +66,8 @@ var (
 		Name:  Prune,
 		Usage: "Remove all files created by the current recipes",
 	}
-	DryRunFlag = cli.BoolFlag{
-		Name:  DryRun,
+	DryFlag = cli.BoolFlag{
+		Name:  Dry,
 		Usage: "Don't actually run any recipe; just print them",
 	}
 )
@@ -91,14 +91,13 @@ func App(cwd string, addrs []lang.RawAddress) *cli.App {
 			Usage: task.Description,
 			Flags: []cli.Flag{
 				PruneFlag,
-				DryRunFlag,
+				DryFlag,
 			},
 			Action: func(c *cli.Context) error {
 				state := lang.NewState(cwd, task.Name)
-				state.DryRun = c.Bool(DryRun)
+				state.Dry = c.Bool(Dry)
 				state.Prune = c.Bool(Prune)
 
-				// todo: handle prune flag
 				diags := internal.Do(state, addrs)
 				if diags.HasErrors() {
 					return diags
