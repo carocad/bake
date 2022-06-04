@@ -29,7 +29,7 @@ task "vet" {
 }
 
 task "test" {
-  command = "go test -v -timeout 30s ./... | tee ${local.test_report}"
+  command = "go test -timeout 30s ./... | tee ${local.test_report}"
   creates = local.test_report
   sources  = [local.go_sources]
 
