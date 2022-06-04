@@ -23,7 +23,7 @@ task "compile" {
 }
 
 task "vet" {
-  command = "go vet ./... | tee ${local.vet_report}"
+  command = "go vet -v ./... | tee ${local.vet_report}"
   creates = local.vet_report
   sources  = [local.go_sources]
 }
