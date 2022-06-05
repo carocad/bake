@@ -17,6 +17,7 @@ type State struct {
 	Args        []string
 	Dry         bool
 	Prune       bool
+	Force       bool
 	Parallelism uint8
 	Task        string
 }

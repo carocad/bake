@@ -58,17 +58,22 @@ func do(cwd string) (hcl.DiagnosticWriter, error) {
 const (
 	Dry   = "dry"
 	Prune = "prune"
+	Force = "force"
 	// Watch  = "watch" TODO
 )
 
 var (
 	PruneFlag = cli.BoolFlag{
 		Name:  Prune,
-		Usage: "Remove all files created by the current recipes",
+		Usage: "Remove all files created by the recipes and its dependencies",
 	}
 	DryFlag = cli.BoolFlag{
 		Name:  Dry,
 		Usage: "Don't actually run any recipe; just print them",
+	}
+	ForceFlag = cli.BoolFlag{
+		Name:  Force,
+		Usage: "Force the current task to run even if nothing changed",
 	}
 )
 
@@ -92,11 +97,13 @@ func App(cwd string, addrs []lang.RawAddress) *cli.App {
 			Flags: []cli.Flag{
 				PruneFlag,
 				DryFlag,
+				ForceFlag,
 			},
 			Action: func(c *cli.Context) error {
 				state := lang.NewState(cwd, task.Name)
 				state.Dry = c.Bool(Dry)
 				state.Prune = c.Bool(Prune)
+				state.Force = c.Bool(Force)
 
 				diags := internal.Do(state, addrs)
 				if diags.HasErrors() {

@@ -84,6 +84,10 @@ func (t *Task) Apply(state State) hcl.Diagnostics {
 }
 
 func (t Task) dryRun(state State) (shouldApply bool, reason string, diags hcl.Diagnostics) {
+	if state.Force {
+		return true, "force run is in effect", nil
+	}
+
 	if t.Command == "" && t.Creates != "" {
 		return false, "", hcl.Diagnostics{{
 			Severity: hcl.DiagError,
@@ -203,6 +207,10 @@ func (t *Task) run(log *log.Logger) hcl.Diagnostics {
 }
 
 func (t Task) dryPrune(state State) (shouldApply bool, reason string, diags hcl.Diagnostics) {
+	if state.Force {
+		return true, "force prunning is in effect", nil
+	}
+
 	if t.Creates == "" {
 		return false, "nothing to prune", nil
 	}
