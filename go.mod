@@ -5,6 +5,7 @@ go 1.18
 require (
 	github.com/agext/levenshtein v1.2.1
 	github.com/hashicorp/hcl/v2 v2.12.0
+	github.com/mitchellh/colorstring v0.0.0-20190213212951-d06e56a500db
 	github.com/urfave/cli v1.22.9
 	github.com/zclconf/go-cty v1.8.0
 	golang.org/x/sync v0.0.0-20220513210516-0976fa681c29
