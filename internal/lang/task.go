@@ -23,7 +23,7 @@ type Task struct {
 	Creates     string   `hcl:"creates,optional"`
 	Sources     []string `hcl:"sources,optional"`
 	Remain      hcl.Body `hcl:",remain"`
-	exitCode    values.EventualInt64
+	ExitCode    values.EventualInt64
 	metadata    TaskMetadata
 }
 
@@ -82,7 +82,7 @@ func (t Task) CTY() cty.Value {
 
 func (t *Task) Apply(state State) hcl.Diagnostics {
 	// dont apply twice in case more than 1 task depends on this
-	if t.exitCode.Valid || t.Command == "" {
+	if t.ExitCode.Valid || t.Command == "" {
 		return nil
 	}
 
@@ -201,7 +201,7 @@ func (t *Task) run(log *log.Logger) hcl.Diagnostics {
 	err := command.Run()
 	log.Println(`done in ` + command.ProcessState.UserTime().String())
 	// store results
-	t.exitCode = values.EventualInt64{
+	t.ExitCode = values.EventualInt64{
 		Int64: int64(command.ProcessState.ExitCode()),
 		Valid: true,
 	}
@@ -214,7 +214,7 @@ func (t *Task) run(log *log.Logger) hcl.Diagnostics {
 	if err != nil {
 		return hcl.Diagnostics{{
 			Severity: hcl.DiagError,
-			Summary:  fmt.Sprintf(`"%s" task failed with exit code %d`, PathString(t.GetPath()), t.exitCode.Int64),
+			Summary:  fmt.Sprintf(`"%s" task failed with exit code %d`, PathString(t.GetPath()), t.ExitCode.Int64),
 			Detail:   detail,
 			Subject:  &t.metadata.Command,
 			Context:  &t.metadata.Block,

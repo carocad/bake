@@ -54,3 +54,12 @@ func (m *Map[K, V]) Get(key K) (V, bool) {
 	item, ok := m.items[index]
 	return item, ok
 }
+
+// Merge m2 on top of m1 in place!
+func Merge[K comparable, V any](m1 map[K]V, m2 map[K]V) map[K]V {
+	for k, v := range m2 {
+		m1[k] = v
+	}
+
+	return m1
+}

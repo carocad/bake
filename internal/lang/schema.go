@@ -31,6 +31,7 @@ const (
 )
 
 var (
+	TaskPrefix  = cty.GetAttrPath(TaskLabel)
 	DataPrefix  = cty.GetAttrPath(DataLabel)
 	LocalPrefix = cty.GetAttrPath(LocalScope)
 	PathPrefix  = cty.GetAttrPath(PathScope)

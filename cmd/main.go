@@ -81,7 +81,7 @@ func App(cwd string, addrs []lang.RawAddress) *cli.App {
 	tasks := lang.GetPublicTasks(addrs)
 	usage := `Build task orchestration. 
 		
-		NOTE: The "commands" below only contain task which have a description.`
+		NOTE: The "commands" below only contain tasks which have a description.`
 	app := &cli.App{
 		Name:  "bake",
 		Usage: usage,

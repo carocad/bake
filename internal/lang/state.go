@@ -1,6 +1,7 @@
 package lang
 
 import (
+	"bake/internal/concurrent"
 	"log"
 	"os"
 	"path/filepath"
@@ -54,6 +55,7 @@ func (state State) Context(addr RawAddress, actions []Action) *hcl.EvalContext {
 
 	data := map[string]cty.Value{}
 	local := map[string]cty.Value{}
+	task := map[string]cty.Value{}
 	for _, act := range actions {
 		name := act.GetName()
 		path := act.GetPath()
@@ -64,13 +66,15 @@ func (state State) Context(addr RawAddress, actions []Action) *hcl.EvalContext {
 		case path.HasPrefix(LocalPrefix):
 			local[name] = value
 		default:
-			// only targets for now !!
-			variables[name] = value
+			task[name] = value
 		}
 	}
 
 	variables[DataLabel] = cty.ObjectVal(data)
 	variables[LocalScope] = cty.ObjectVal(local)
+	variables[PathScope] = cty.ObjectVal(task)
+	// allow tasks to be referred without a prefix
+	concurrent.Merge(variables, task)
 	return &hcl.EvalContext{
 		Variables: variables,
 		Functions: Functions(),
