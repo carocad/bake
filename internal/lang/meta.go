@@ -26,7 +26,10 @@ func decodeBodyToValue(body hcl.Body, ctx *hcl.EvalContext, val reflect.Value) h
 	case reflect.Struct:
 		return decodeBodyToStruct(body, ctx, val)
 	default:
-		panic(fmt.Sprintf("target value must be pointer to struct, not %s", et.String()))
+		return hcl.Diagnostics{{
+			Severity: hcl.DiagError,
+			Summary:  fmt.Sprintf("target value must be pointer to struct, not %s", et.String()),
+		}}
 	}
 }
 

@@ -17,28 +17,60 @@ import (
 )
 
 type Task struct {
-	addressBlock
+	Name        string
 	Description string   `hcl:"description,optional"`
 	Command     string   `hcl:"command,optional"`
 	Creates     string   `hcl:"creates,optional"`
 	Sources     []string `hcl:"sources,optional"`
 	Remain      hcl.Body `hcl:",remain"`
 	exitCode    values.EventualInt64
+	metadata    TaskMetadata
+}
+
+type TaskMetadata struct {
+	// manual metadata
+	Block hcl.Range
+	// metadata from block
+	// Description cannot be fetch from Block since it was already decoded
+	Command   hcl.Range
+	Creates   hcl.Range
+	Sources   hcl.Range
+	Remain    hcl.Range
+	DependsOn hcl.Range
 }
 
 func NewTask(raw addressBlock, ctx *hcl.EvalContext) (*Task, hcl.Diagnostics) {
-	task := &Task{addressBlock: raw}
-	diagnostics := gohcl.DecodeBody(raw.Block.Body, ctx, task)
-	if diagnostics.HasErrors() {
-		return nil, diagnostics
+	meta := TaskMetadata{Block: raw.Block.DefRange}
+	diags := DecodeRange(raw.Block.Body, ctx, &meta)
+	if diags.HasErrors() {
+		return nil, diags
 	}
 
-	diagnostics = checkDependsOn(task.Remain)
-	if diagnostics.HasErrors() {
-		return nil, diagnostics
+	task := &Task{Name: raw.GetName(), metadata: meta}
+	diags = gohcl.DecodeBody(raw.Block.Body, ctx, task)
+	if diags.HasErrors() {
+		return nil, diags
+	}
+
+	diags = checkDependsOn(task.Remain)
+	if diags.HasErrors() {
+		return nil, diags
 	}
 
 	return task, nil
+}
+
+func (t Task) GetName() string {
+	return t.Name
+}
+
+func (t Task) GetPath() cty.Path {
+	// todo: change this to deal with for_each cases
+	return cty.GetAttrPath(TaskLabel).GetAttr(t.GetName())
+}
+
+func (t Task) GetFilename() string {
+	return t.metadata.Block.Filename
 }
 
 func (t Task) CTY() cty.Value {
@@ -92,8 +124,8 @@ func (t Task) dryRun(state State) (shouldApply bool, reason string, diags hcl.Di
 		return false, "", hcl.Diagnostics{{
 			Severity: hcl.DiagError,
 			Summary:  `"command" cannot be empty when "creates" is provided`,
-			Subject:  GetRangeFor(t.Block, CreatesAttr),
-			Context:  t.Block.DefRange.Ptr(),
+			Subject:  &t.metadata.Creates,
+			Context:  &t.metadata.Block,
 		}}
 	}
 
@@ -116,8 +148,8 @@ func (t Task) dryRun(state State) (shouldApply bool, reason string, diags hcl.Di
 				Severity: hcl.DiagError,
 				Summary:  fmt.Sprintf(`pattern "%s" is malformed`, pattern),
 				Detail:   err.Error(),
-				Subject:  GetRangeFor(t.Block, SourcesAttr),
-				Context:  t.Block.DefRange.Ptr(),
+				Subject:  &t.metadata.Sources,
+				Context:  &t.metadata.Block,
 			}}
 		}
 
@@ -132,8 +164,8 @@ func (t Task) dryRun(state State) (shouldApply bool, reason string, diags hcl.Di
 					Severity: hcl.DiagError,
 					Summary:  fmt.Sprintf(`error getting "%s" stat information`, filename),
 					Detail:   err.Error(),
-					Subject:  GetRangeFor(t.Block, SourcesAttr),
-					Context:  t.Block.DefRange.Ptr(),
+					Subject:  &t.metadata.Sources,
+					Context:  &t.metadata.Block,
 				}}
 			}
 
@@ -184,8 +216,8 @@ func (t *Task) run(log *log.Logger) hcl.Diagnostics {
 			Severity: hcl.DiagError,
 			Summary:  fmt.Sprintf(`"%s" task failed with exit code %d`, PathString(t.GetPath()), t.exitCode.Int64),
 			Detail:   detail,
-			Subject:  GetRangeFor(t.Block, CommandAttr),
-			Context:  t.Block.DefRange.Ptr(),
+			Subject:  &t.metadata.Command,
+			Context:  &t.metadata.Block,
 		}}
 	}
 
@@ -198,8 +230,8 @@ func (t *Task) run(log *log.Logger) hcl.Diagnostics {
 		return hcl.Diagnostics{{
 			Severity: hcl.DiagError,
 			Summary:  fmt.Sprintf(`"%s" didn't create the expected file "%s"`, PathString(t.GetPath()), t.Creates),
-			Subject:  GetRangeFor(t.Block, CreatesAttr),
-			Context:  &t.Block.TypeRange,
+			Subject:  &t.metadata.Creates,
+			Context:  &t.metadata.Block,
 		}}
 	}
 
@@ -230,8 +262,8 @@ func (t *Task) prune(log *log.Logger) hcl.Diagnostics {
 			Severity: hcl.DiagError,
 			Summary:  "error pruning task " + t.GetName(),
 			Detail:   err.Error(),
-			Subject:  GetRangeFor(t.Block, CreatesAttr),
-			Context:  &t.Block.TypeRange,
+			Subject:  &t.metadata.Creates,
+			Context:  &t.metadata.Block,
 		}}
 	}
 

@@ -56,5 +56,8 @@ COMMAND
 task "libraries" {
   creates = "go.sum"
   sources = ["go.mod"]
-  command = "go mod download"
+  command = <<COMMAND
+  go mod download
+  go mod tidy
+  COMMAND
 }

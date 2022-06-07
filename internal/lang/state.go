@@ -27,26 +27,20 @@ const DefaultParallelism = 4
 
 func NewState(cwd string, task string) *State {
 	// organize out env vars
-
-	return &State{
-		CWD:         cwd,
-		Env:         Env(),
-		Args:        os.Args,
-		Parallelism: DefaultParallelism,
-		Task:        task,
-	}
-}
-
-func Env() map[string]string {
 	env := map[string]string{}
-	environ := os.Environ()
-	for _, keyVal := range environ {
+	for _, keyVal := range os.Environ() {
 		parts := strings.SplitN(keyVal, "=", 2)
 		key, val := parts[0], parts[1]
 		env[key] = val
 	}
 
-	return env
+	return &State{
+		CWD:         cwd,
+		Env:         env,
+		Args:        os.Args,
+		Parallelism: DefaultParallelism,
+		Task:        task,
+	}
 }
 
 func (state State) Context(addr RawAddress, actions []Action) *hcl.EvalContext {
