@@ -61,11 +61,23 @@ func Do(config *lang.State, addrs []lang.RawAddress) hcl.Diagnostics {
 	coordinator := module.NewCoordinator(context.TODO(), *config)
 	log := config.NewLogger(task)
 	start := time.Now()
-	_, diags = coordinator.Do(task, addrs)
+	actions, diags := coordinator.Do(task, addrs)
 	end := time.Now()
 	log.Printf(`done in %s`, end.Sub(start).String())
 	if diags.HasErrors() {
 		return diags
+	}
+
+	// todo: compute the operation for an easier overview
+	if !config.Dry && !config.Prune {
+		err := config.Store(actions)
+		if err != nil {
+			return hcl.Diagnostics{{
+				Severity: hcl.DiagError,
+				Summary:  "error storing state",
+				Detail:   err.Error(),
+			}}
+		}
 	}
 
 	return nil

@@ -18,3 +18,4 @@
 cmd/*.txt
 version.go
 .vscode
+.bake

@@ -57,6 +57,10 @@ func NewTask(raw addressBlock, ctx *hcl.EvalContext) (*Task, hcl.Diagnostics) {
 		return nil, diags
 	}
 
+	// make sure that irrelevant changes dont taint the state (example from ./dir/file to dir/file)
+	if task.Creates != "" {
+		task.Creates = filepath.Clean(task.Creates)
+	}
 	return task, nil
 }
 
@@ -66,7 +70,7 @@ func (t Task) GetName() string {
 
 func (t Task) GetPath() cty.Path {
 	// todo: change this to deal with for_each cases
-	return cty.GetAttrPath(TaskLabel).GetAttr(t.GetName())
+	return cty.GetAttrPath(t.GetName())
 }
 
 func (t Task) GetFilename() string {
