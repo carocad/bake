@@ -31,7 +31,13 @@ type State struct {
 
 const DefaultParallelism = 4
 
-func NewState(cwd string, task string) *State {
+func NewState() (*State, error) {
+	// where are we?
+	cwd, err := os.Getwd()
+	if err != nil {
+		return nil, err
+	}
+
 	// organize out env vars
 	env := map[string]string{}
 	for _, keyVal := range os.Environ() {
@@ -45,8 +51,7 @@ func NewState(cwd string, task string) *State {
 		Env:         env,
 		Args:        os.Args,
 		Parallelism: DefaultParallelism,
-		Task:        task,
-	}
+	}, nil
 }
 
 func (state State) Context(addr RawAddress, actions []Action) *hcl.EvalContext {
@@ -77,7 +82,7 @@ func (state State) Context(addr RawAddress, actions []Action) *hcl.EvalContext {
 
 	variables[DataLabel] = cty.ObjectVal(data)
 	variables[LocalScope] = cty.ObjectVal(local)
-	variables[PathScope] = cty.ObjectVal(task)
+	variables[TaskLabel] = cty.ObjectVal(task)
 	// allow tasks to be referred without a prefix
 	concurrent.Merge(variables, task)
 	return &hcl.EvalContext{
