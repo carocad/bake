@@ -82,7 +82,7 @@ func do() (hcl.DiagnosticWriter, error) {
 		app.Commands = append(app.Commands, cmd)
 	}
 
-	app.Run(os.Args)
+	err = app.Run(os.Args)
 	if err != nil {
 		return log, err
 	}
