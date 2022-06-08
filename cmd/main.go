@@ -66,12 +66,12 @@ func do() (hcl.DiagnosticWriter, error) {
 				ForceFlag,
 			},
 			Action: func(c *cli.Context) error {
-				state.Task = c.Command.Name
-				state.Dry = c.Bool(Dry)
-				state.Prune = c.Bool(Prune)
-				state.Force = c.Bool(Force)
+				state.Flags, err = lang.NewStateFlags(c.Bool(Dry), c.Bool(Prune), c.Bool(Force))
+				if err != nil {
+					return err
+				}
 
-				diags := internal.Do(state, addrs)
+				diags := internal.Do(c.Command.Name, state, addrs)
 				if diags.HasErrors() {
 					return diags
 				}

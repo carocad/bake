@@ -2,15 +2,11 @@ package lang
 
 import (
 	"bake/internal/concurrent"
-	"bake/internal/lang/info"
-	"encoding/json"
-	"hash/crc64"
+	"fmt"
 	"log"
 	"os"
 	"path/filepath"
-	"strconv"
 	"strings"
-	"time"
 
 	"github.com/hashicorp/hcl/v2"
 	"github.com/mitchellh/colorstring"
@@ -22,11 +18,26 @@ type State struct {
 	// Context     context.Context TODO
 	Env         map[string]string
 	Args        []string
-	Dry         bool
-	Prune       bool
-	Force       bool
+	Flags       StateFlags
 	Parallelism uint8
-	Task        string
+}
+
+type StateFlags struct {
+	Dry   bool
+	Prune bool
+	Force bool
+}
+
+func NewStateFlags(dry, prune, force bool) (StateFlags, error) {
+	if dry && force {
+		return StateFlags{}, fmt.Errorf(`"dry" and "force" are contradictory flags`)
+	}
+
+	return StateFlags{
+		Dry:   dry,
+		Prune: prune,
+		Force: force,
+	}, nil
 }
 
 const DefaultParallelism = 4
@@ -95,52 +106,4 @@ func (state State) NewLogger(addr Address) *log.Logger {
 	prefix := colorstring.Color("[bold]" + PathString(addr.GetPath()))
 	// todo: change stdout according to state
 	return log.New(os.Stdout, prefix+": ", 0)
-}
-
-const StatePath = ".bake"
-
-type Lock struct {
-	Version   string
-	Timestamp time.Time
-	Tasks     map[string]TaskHash
-}
-
-type TaskHash struct {
-	// Creates keep a ref to the old filename in case it is renamed
-	Creates string
-	// hash the env and the command in case they change
-	// Env     string TODO
-	Command string
-}
-
-// TODO: a single execution of Store isnt the whole picture so I need to merge
-// the old state with the new one
-func (state State) Store(actions []Action) error {
-	object := Lock{Version: info.Version, Timestamp: time.Now(), Tasks: map[string]TaskHash{}}
-	for _, action := range actions {
-		task, ok := action.(*Task)
-		if ok && task.ExitCode.Int64 == 0 && task.Creates != "" {
-			checksum := crc64.Checksum([]byte(task.Command), crc64.MakeTable(crc64.ISO))
-			object.Tasks[PathString(task.GetPath())] = TaskHash{
-				Creates: task.Creates,
-				Command: strconv.FormatUint(checksum, 16),
-			}
-		}
-	}
-
-	statePath := filepath.Join(state.CWD, StatePath, "lock.json")
-	err := os.MkdirAll(filepath.Dir(statePath), 0770)
-	if err != nil {
-		return err
-	}
-
-	file, err := os.Create(statePath)
-	if err != nil {
-		return err
-	}
-
-	// pretty print it for easier debugging
-	encoder := json.NewEncoder(file)
-	encoder.SetIndent("", "  ")
-	return encoder.Encode(object)
 }

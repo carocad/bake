@@ -8,6 +8,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"bake/internal/lang/values"
 
@@ -91,28 +92,36 @@ func (t *Task) Apply(state State) hcl.Diagnostics {
 	}
 
 	log := state.NewLogger(t)
-	if state.Prune {
+	if state.Flags.Prune {
 		shouldRun, description, diags := t.dryPrune(state)
 		if diags.HasErrors() {
 			return diags
 		}
 
 		log.Println(description)
-		if !shouldRun || state.Dry {
+		if state.Flags.Dry {
+			return nil
+		}
+
+		if !shouldRun && !state.Flags.Force {
 			return nil
 		}
 
 		return t.prune(log)
 	}
 
-	// run
+	// run by default
 	shouldRun, description, diags := t.dryRun(state)
 	if diags.HasErrors() {
 		return diags
 	}
 
 	log.Println(description)
-	if !shouldRun || state.Dry {
+	if state.Flags.Dry {
+		return nil
+	}
+
+	if !shouldRun && !state.Flags.Force {
 		return nil
 	}
 
@@ -120,7 +129,7 @@ func (t *Task) Apply(state State) hcl.Diagnostics {
 }
 
 func (t Task) dryRun(state State) (shouldApply bool, reason string, diags hcl.Diagnostics) {
-	if state.Force {
+	if state.Flags.Force {
 		return true, "force run is in effect", nil
 	}
 
@@ -202,8 +211,12 @@ func (t *Task) run(log *log.Logger) hcl.Diagnostics {
 	var stdout, stderr bytes.Buffer
 	command.Stdout = &stdout
 	command.Stderr = &stderr
+	start := time.Now()
 	err := command.Run()
-	log.Println(`done in ` + command.ProcessState.UserTime().String())
+	end := time.Now()
+	// command.ProcessState.UserTime().String() provides inconsistent results
+	// if the process is just iddling
+	log.Println(`done in ` + end.Sub(start).String())
 	// store results
 	t.ExitCode = values.EventualInt64{
 		Int64: int64(command.ProcessState.ExitCode()),
@@ -243,7 +256,7 @@ func (t *Task) run(log *log.Logger) hcl.Diagnostics {
 }
 
 func (t Task) dryPrune(state State) (shouldApply bool, reason string, diags hcl.Diagnostics) {
-	if state.Force {
+	if state.Flags.Force {
 		return true, "force prunning is in effect", nil
 	}
 

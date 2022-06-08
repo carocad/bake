@@ -2,11 +2,16 @@ package internal
 
 import (
 	"context"
+	"encoding/json"
+	"hash/crc64"
 	"io/ioutil"
+	"os"
 	"path/filepath"
+	"strconv"
 	"time"
 
 	"bake/internal/lang"
+	"bake/internal/lang/info"
 	"bake/internal/module"
 
 	"github.com/hashicorp/hcl/v2"
@@ -52,8 +57,8 @@ func ReadRecipes(cwd string, parser *hclparse.Parser) ([]lang.RawAddress, hcl.Di
 	return addresses, nil
 }
 
-func Do(config *lang.State, addrs []lang.RawAddress) hcl.Diagnostics {
-	task, diags := module.GetTask(config.Task, addrs)
+func Do(taskName string, config *lang.State, addrs []lang.RawAddress) hcl.Diagnostics {
+	task, diags := module.GetTask(taskName, addrs)
 	if diags.HasErrors() {
 		return diags
 	}
@@ -68,9 +73,8 @@ func Do(config *lang.State, addrs []lang.RawAddress) hcl.Diagnostics {
 		return diags
 	}
 
-	// todo: compute the operation for an easier overview
-	if !config.Dry && !config.Prune {
-		err := config.Store(actions)
+	if !config.Flags.Dry && !config.Flags.Prune {
+		err := store(config.CWD, actions)
 		if err != nil {
 			return hcl.Diagnostics{{
 				Severity: hcl.DiagError,
@@ -81,4 +85,55 @@ func Do(config *lang.State, addrs []lang.RawAddress) hcl.Diagnostics {
 	}
 
 	return nil
+}
+
+const (
+	StatePath         = ".bake"
+	StateLockFilename = "lock.json"
+)
+
+type Lock struct {
+	Version   string
+	Timestamp time.Time
+	Tasks     map[string]TaskHash
+}
+
+type TaskHash struct {
+	// Creates keep a ref to the old filename in case it is renamed
+	Creates string
+	// hash the env and the command in case they change
+	// Env     string TODO
+	Command string
+}
+
+// TODO: a single execution of store isnt the whole picture so I need to merge
+// the old state with the new one
+func store(cwd string, actions []lang.Action) error {
+	object := Lock{Version: info.Version, Timestamp: time.Now(), Tasks: map[string]TaskHash{}}
+	for _, action := range actions {
+		task, ok := action.(*lang.Task)
+		if ok && task.ExitCode.Int64 == 0 && task.Creates != "" {
+			checksum := crc64.Checksum([]byte(task.Command), crc64.MakeTable(crc64.ISO))
+			object.Tasks[lang.PathString(task.GetPath())] = TaskHash{
+				Creates: task.Creates,
+				Command: strconv.FormatUint(checksum, 16),
+			}
+		}
+	}
+
+	statePath := filepath.Join(cwd, StatePath, StateLockFilename)
+	err := os.MkdirAll(filepath.Dir(statePath), 0770)
+	if err != nil {
+		return err
+	}
+
+	file, err := os.Create(statePath)
+	if err != nil {
+		return err
+	}
+
+	// pretty print it for easier debugging
+	encoder := json.NewEncoder(file)
+	encoder.SetIndent("", "  ")
+	return encoder.Encode(object)
 }
