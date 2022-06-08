@@ -66,12 +66,16 @@ func (lock *Lock) update(actions []lang.Action) {
 	for _, action := range actions {
 		task, ok := action.(*lang.Task)
 		if ok && task.ExitCode.Int64 == 0 && task.Creates != "" {
-			checksum := crc64.Checksum([]byte(task.Command), crc64.MakeTable(crc64.ISO))
-			lock.Tasks[lang.PathString(task.GetPath())] = TaskHash{
-				Creates: task.Creates,
-				Command: strconv.FormatUint(checksum, 16),
-			}
+			lock.Tasks[lang.PathString(task.GetPath())] = HashTask(task)
 		}
+	}
+}
+
+func HashTask(task *lang.Task) TaskHash {
+	checksum := crc64.Checksum([]byte(task.Command), crc64.MakeTable(crc64.ISO))
+	return TaskHash{
+		Creates: task.Creates,
+		Command: strconv.FormatUint(checksum, 16),
 	}
 }
 
