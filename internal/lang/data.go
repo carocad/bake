@@ -7,6 +7,7 @@ import (
 	"os/exec"
 	"strings"
 
+	"bake/internal/lang/config"
 	"bake/internal/lang/schema"
 	"bake/internal/lang/values"
 
@@ -40,12 +41,16 @@ func (d Data) CTY() cty.Value {
 	return cty.ObjectVal(m)
 }
 
-func (d *Data) Apply(state State) hcl.Diagnostics {
+func (d Data) Hash() *config.Hash {
+	return nil
+}
+
+func (d *Data) Apply(state config.State) hcl.Diagnostics {
 	if d.ExitCode.Valid { // apply data even on dry run
 		return nil
 	}
 
-	log := state.NewLogger(d)
+	log := NewLogger(d)
 	log.Println(`refreshing ...`)
 	// which shell should I use?
 	terminal := "bash"

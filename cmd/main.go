@@ -3,6 +3,7 @@ package main
 import (
 	"bake/internal"
 	"bake/internal/lang"
+	"bake/internal/lang/config"
 	"fmt"
 	"os"
 
@@ -34,7 +35,7 @@ func do() (hcl.DiagnosticWriter, error) {
 	parser := hclparse.NewParser()
 	// logger for diagnostics
 	log := hcl.NewDiagnosticTextWriter(os.Stdout, parser.Files(), 78, true)
-	state, err := lang.NewState()
+	state, err := config.NewState()
 	if err != nil {
 		return nil, err
 	}
@@ -66,7 +67,7 @@ func do() (hcl.DiagnosticWriter, error) {
 				ForceFlag,
 			},
 			Action: func(c *cli.Context) error {
-				state.Flags, err = lang.NewStateFlags(c.Bool(Dry), c.Bool(Prune), c.Bool(Force))
+				state.Flags, err = config.NewStateFlags(c.Bool(Dry), c.Bool(Prune), c.Bool(Force))
 				if err != nil {
 					return err
 				}

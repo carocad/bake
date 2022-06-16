@@ -1,14 +1,14 @@
-package lang
+package config
 
 import (
+	"bake/internal/info"
+	"bake/internal/lang/schema"
 	"encoding/json"
-	"hash/crc64"
 	"os"
 	"path/filepath"
-	"strconv"
 	"time"
 
-	"bake/internal/lang/info"
+	"github.com/zclconf/go-cty/cty"
 )
 
 const (
@@ -19,14 +19,14 @@ const (
 type Lock struct {
 	Version   string
 	Timestamp time.Time
-	Tasks     map[string]TaskHash
+	Tasks     map[string]Hash
 }
 
 func newLock() *Lock {
 	return &Lock{
 		Version:   info.Version,
 		Timestamp: time.Now(),
-		Tasks:     make(map[string]TaskHash),
+		Tasks:     make(map[string]Hash),
 	}
 }
 
@@ -51,18 +51,15 @@ func lockFromFilesystem(cwd string) (*Lock, error) {
 	return &lock, nil
 }
 
-func (lock *Lock) Update(actions []Action) {
+func (lock *Lock) Update(hashes []*Hash) {
 	lock.Version = info.Version
 	lock.Timestamp = time.Now()
-	for _, action := range actions {
-		task, ok := action.(*Task)
-		if !ok {
+	for _, hash := range hashes {
+		if hash == nil || hash.Dirty || hash.Creates == "" {
 			continue
 		}
 
-		if ok && task.ExitCode.Valid && task.ExitCode.Int64 == 0 && task.Creates != "" {
-			lock.Tasks[AddressToString(task)] = NewTaskHash(*task)
-		}
+		lock.Tasks[schema.PathString(hash.Path)] = *hash
 	}
 }
 
@@ -84,18 +81,14 @@ func (lock *Lock) Store(cwd string) error {
 	return encoder.Encode(lock)
 }
 
-type TaskHash struct {
+type Hash struct {
+	// Dirty flags a Hash as comming from a Task that might have not exit correctly
+	Dirty bool
+	Path  cty.Path `json:"_"`
 	// Creates keep a ref to the old filename in case it is renamed
 	Creates string
-	// hash the env and the command in case they change
-	// Env     string TODO
+	// Env hash just to check if it changes between executions
+	Env string
+	// Command hash just to check if it changes between executions
 	Command string
-}
-
-func NewTaskHash(task Task) TaskHash {
-	checksum := crc64.Checksum([]byte(task.Command), crc64.MakeTable(crc64.ISO))
-	return TaskHash{
-		Creates: task.Creates,
-		Command: strconv.FormatUint(checksum, 16),
-	}
 }

@@ -3,6 +3,7 @@ package module
 import (
 	"bake/internal/functional"
 	"bake/internal/lang"
+	"bake/internal/lang/config"
 	"context"
 	"fmt"
 	"math"
@@ -49,11 +50,15 @@ func (s fakeAddress) CTY() cty.Value {
 	return cty.StringVal(s.name)
 }
 
-func (s fakeAddress) Plan(state lang.State) (bool, string, hcl.Diagnostics) {
+func (s fakeAddress) Hash() *config.Hash {
+	return nil
+}
+
+func (s fakeAddress) Plan(state config.State) (bool, string, hcl.Diagnostics) {
 	return true, fmt.Sprintf(`refreshing "%s"`, lang.AddressToString(s)), nil
 }
 
-func (s fakeAddress) Apply(state lang.State) hcl.Diagnostics {
+func (s fakeAddress) Apply(state config.State) hcl.Diagnostics {
 	time.Sleep(200 * time.Millisecond)
 	return nil
 }
@@ -66,7 +71,7 @@ func TestSerialCoordination(t *testing.T) {
 		data = append(data, fakeAddress{value, preData[:index]})
 	}
 
-	eval, err := lang.NewState()
+	eval, err := config.NewState()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -101,7 +106,7 @@ func TestParallelCoordination(t *testing.T) {
 		data = append(data, fakeAddress{value, nil})
 	}
 
-	eval, err := lang.NewState()
+	eval, err := config.NewState()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -135,7 +140,7 @@ func TestCustomCoordination(t *testing.T) {
 	}}
 
 	addresses := functional.Map(data, func(f fakeAddress) lang.RawAddress { return f })
-	eval, err := lang.NewState()
+	eval, err := config.NewState()
 	if err != nil {
 		t.Fatal(err)
 	}

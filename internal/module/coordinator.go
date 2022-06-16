@@ -3,12 +3,16 @@ package module
 import (
 	"bake/internal/concurrent"
 	"bake/internal/lang"
+	"bake/internal/lang/config"
+	"bake/internal/lang/schema"
 	"bake/internal/module/topo"
 	"context"
 	"fmt"
+	"path/filepath"
 	"sync"
 
 	"github.com/hashicorp/hcl/v2"
+	"github.com/zclconf/go-cty/cty"
 	"golang.org/x/sync/errgroup"
 )
 
@@ -69,10 +73,10 @@ type Coordinator struct {
 	pool    *errgroup.Group
 	waiting *concurrent.Map[lang.Address, *sync.WaitGroup]
 	actions *concurrent.Slice[lang.Action]
-	state   lang.State
+	state   config.State
 }
 
-func NewCoordinator(ctx context.Context, eval lang.State) Coordinator {
+func NewCoordinator(ctx context.Context, eval config.State) Coordinator {
 	// todo: do I need to return the context?
 	bounded, _ := errgroup.WithContext(ctx)
 	bounded.SetLimit(int(eval.Parallelism))
@@ -108,7 +112,8 @@ func (coordinator *Coordinator) Do(task lang.RawAddress, addresses []lang.RawAdd
 			return nil, diags
 		}
 
-		evalContext := coordinator.state.Context(address, coordinator.actions.Items())
+		// evalContext := coordinator.state.Context(address, coordinator.actions.Items())
+		evalContext := coordinator.context(address, coordinator.actions.Items())
 		actions, diags := address.Decode(evalContext)
 		if diags.HasErrors() {
 			return nil, diags
@@ -159,4 +164,44 @@ func (coordinator *Coordinator) waitFor(dependencies []lang.RawAddress) hcl.Diag
 	}
 
 	return nil
+}
+
+func (coordinator *Coordinator) context(addr lang.Address, actions []lang.Action) *hcl.EvalContext {
+	parent := coordinator.state.Context()
+	child := parent.NewChild()
+
+	cwd := coordinator.state.CWD
+	variables := map[string]cty.Value{
+		"path": cty.ObjectVal(map[string]cty.Value{
+			"root":    cty.StringVal(cwd),
+			"module":  cty.StringVal(filepath.Join(cwd, filepath.Dir(addr.GetFilename()))),
+			"current": cty.StringVal(filepath.Join(cwd, addr.GetFilename())),
+		}),
+	}
+
+	data := map[string]cty.Value{}
+	local := map[string]cty.Value{}
+	task := map[string]cty.Value{}
+	for _, act := range actions {
+		name := act.GetName()
+		path := act.GetPath()
+		value := act.CTY()
+		switch {
+		case path.HasPrefix(schema.DataPrefix):
+			data[name] = value
+		case path.HasPrefix(schema.LocalPrefix):
+			local[name] = value
+		default:
+			task[name] = value
+		}
+	}
+
+	variables[schema.DataLabel] = cty.ObjectVal(data)
+	variables[schema.LocalScope] = cty.ObjectVal(local)
+	variables[schema.TaskLabel] = cty.ObjectVal(task)
+	// allow tasks to be referred without a prefix
+	concurrent.Merge(variables, task)
+
+	child.Variables = variables
+	return child
 }

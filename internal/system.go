@@ -7,7 +7,9 @@ import (
 	"path/filepath"
 	"time"
 
+	"bake/internal/functional"
 	"bake/internal/lang"
+	"bake/internal/lang/config"
 	"bake/internal/lang/schema"
 	"bake/internal/module"
 
@@ -54,23 +56,29 @@ func ReadRecipes(cwd string, parser *hclparse.Parser) ([]lang.RawAddress, hcl.Di
 	return addresses, nil
 }
 
-func Do(taskName string, state *lang.State, addrs []lang.RawAddress) hcl.Diagnostics {
+func Do(taskName string, s *config.State, addrs []lang.RawAddress) hcl.Diagnostics {
 	task, diags := module.GetTask(taskName, addrs)
 	if diags.HasErrors() {
 		return diags
 	}
 
-	coordinator := module.NewCoordinator(context.TODO(), *state)
+	coordinator := module.NewCoordinator(context.TODO(), *s)
 	start := time.Now()
 	actions, diags := coordinator.Do(task, addrs)
 	end := time.Now()
-	fmt.Printf("\ndone in %s\n", end.Sub(start).String())
+	if !diags.HasErrors() {
+		fmt.Printf("\ndone in %s\n", end.Sub(start).String())
+	}
 
-	if !state.Flags.Dry && !state.Flags.Prune {
-		state.Lock.Update(actions)
-		err := state.Lock.Store(state.CWD)
+	if !s.Flags.Dry && !s.Flags.Prune {
+		hashes := functional.Map(actions, func(action lang.Action) *config.Hash {
+			return action.Hash()
+		})
+
+		s.Lock.Update(hashes)
+		err := s.Lock.Store(s.CWD)
 		if err != nil {
-			state.NewLogger(task).Fatal(fmt.Errorf("error storing state: %w", err))
+			lang.NewLogger(task).Fatal(fmt.Errorf("error storing state: %w", err))
 		}
 	}
 

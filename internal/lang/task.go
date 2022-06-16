@@ -3,13 +3,16 @@ package lang
 import (
 	"bytes"
 	"fmt"
+	"hash/crc64"
 	"log"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"time"
 
+	"bake/internal/lang/config"
 	"bake/internal/lang/meta"
 	"bake/internal/lang/schema"
 	"bake/internal/lang/values"
@@ -84,13 +87,22 @@ func (t Task) CTY() cty.Value {
 	return values.StructToCty(t)
 }
 
-func (t *Task) Apply(state State) hcl.Diagnostics {
+func (t Task) Hash() *config.Hash {
+	checksum := crc64.Checksum([]byte(t.Command), crc64.MakeTable(crc64.ISO))
+	return &config.Hash{
+		Creates: t.Creates,
+		Command: strconv.FormatUint(checksum, 16),
+		Dirty:   !t.ExitCode.Valid || t.ExitCode.Int64 != 0,
+	}
+}
+
+func (t *Task) Apply(state config.State) hcl.Diagnostics {
 	// don't apply twice in case more than 1 task depends on this
 	if t.ExitCode.Valid || t.Command == "" {
 		return nil
 	}
 
-	log := state.NewLogger(t)
+	log := NewLogger(t)
 	if state.Flags.Prune {
 		shouldRun, description, diags := t.dryPrune(state)
 		if diags.HasErrors() {
@@ -135,7 +147,7 @@ func (t *Task) Apply(state State) hcl.Diagnostics {
 		return nil
 	}
 
-	hash := NewTaskHash(*t)
+	hash := t.Hash()
 	if hash.Creates == oldHash.Creates {
 		return nil
 	}
@@ -154,14 +166,14 @@ func (t *Task) Apply(state State) hcl.Diagnostics {
 	return nil
 }
 
-func (t Task) dryRun(state State) (shouldApply bool, reason string, diags hcl.Diagnostics) {
+func (t Task) dryRun(state config.State) (shouldApply bool, reason string, diags hcl.Diagnostics) {
 	if state.Flags.Force {
 		return true, "force run is in effect", nil
 	}
 
 	oldHash, ok := state.Lock.Tasks[AddressToString(t)]
 	if ok {
-		hash := NewTaskHash(t)
+		hash := t.Hash()
 		if hash.Creates != oldHash.Creates {
 			return true, `"creates" has changed ... baking`, nil
 		}
@@ -294,7 +306,7 @@ func (t *Task) run(log *log.Logger) hcl.Diagnostics {
 	return nil
 }
 
-func (t Task) dryPrune(state State) (shouldApply bool, reason string, diags hcl.Diagnostics) {
+func (t Task) dryPrune(state config.State) (shouldApply bool, reason string, diags hcl.Diagnostics) {
 	if state.Flags.Force {
 		return true, "force prunning is in effect", nil
 	}

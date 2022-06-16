@@ -1,6 +1,8 @@
 package lang
 
 import (
+	"bake/internal/lang/config"
+
 	"github.com/hashicorp/hcl/v2"
 	"github.com/zclconf/go-cty/cty"
 )
@@ -46,10 +48,14 @@ type Local struct {
 	value cty.Value
 }
 
-func (l Local) Apply(state State) hcl.Diagnostics {
+func (l Local) Apply(state config.State) hcl.Diagnostics {
 	return nil
 }
 
 func (l Local) CTY() cty.Value {
 	return l.value
+}
+
+func (l Local) Hash() *config.Hash {
+	return nil
 }
