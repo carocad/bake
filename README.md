@@ -4,6 +4,7 @@ Declarative tasks orchestration
 
 ## target "picture"
 
+- ⌛ automatically clean up running tasks on sig int
 - ✅ data tasks
   - ✅ fetch state information necessary to run the tasks
 - ✅ list (public) tasks:

@@ -17,6 +17,7 @@ import (
 	"bake/internal/lang/schema"
 	"bake/internal/lang/values"
 
+	"github.com/bmatcuk/doublestar/v4"
 	"github.com/hashicorp/hcl/v2"
 	"github.com/hashicorp/hcl/v2/gohcl"
 	"github.com/zclconf/go-cty/cty"
@@ -24,11 +25,12 @@ import (
 
 type Task struct {
 	Name        string
-	Description string   `hcl:"description,optional"`
-	Command     string   `hcl:"command,optional"`
-	Creates     string   `hcl:"creates,optional"`
-	Sources     []string `hcl:"sources,optional"`
-	Remain      hcl.Body `hcl:",remain"`
+	Description string            `hcl:"description,optional"`
+	Command     string            `hcl:"command,optional"`
+	Creates     string            `hcl:"creates,optional"`
+	Sources     []string          `hcl:"sources,optional"`
+	Env         map[string]string `hcl:"env,optional"`
+	Remain      hcl.Body          `hcl:",remain"`
 	ExitCode    values.EventualInt64
 	metadata    TaskMetadata
 }
@@ -67,6 +69,7 @@ func NewTask(raw addressBlock, ctx *hcl.EvalContext) (*Task, hcl.Diagnostics) {
 	if task.Creates != "" {
 		task.Creates = filepath.Clean(task.Creates)
 	}
+
 	return task, nil
 }
 
@@ -88,10 +91,23 @@ func (t Task) CTY() cty.Value {
 }
 
 func (t Task) Hash() *config.Hash {
-	checksum := crc64.Checksum([]byte(t.Command), crc64.MakeTable(crc64.ISO))
+	hasher := crc64.New(crc64.MakeTable(crc64.ISO))
+	// somehow using a map[string]string returns non-deterministic results
+	for _, v := range config.AppendEnv(t.Env) {
+		hasher.Write([]byte(v))
+	}
+	env := hasher.Sum64()
+
+	hasher.Reset()
+
+	hasher.Write([]byte(t.Command))
+	command := hasher.Sum64()
+
 	return &config.Hash{
 		Creates: t.Creates,
-		Command: strconv.FormatUint(checksum, 16),
+		Path:    t.GetPath(),
+		Command: strconv.FormatUint(command, 16),
+		Env:     strconv.FormatUint(env, 16),
 		Dirty:   !t.ExitCode.Valid || t.ExitCode.Int64 != 0,
 	}
 }
@@ -205,7 +221,8 @@ func (t Task) dryRun(state config.State) (shouldApply bool, reason string, diags
 
 	for _, pattern := range t.Sources {
 		// Check pattern is well-formed.
-		matches, err := filepath.Glob(pattern)
+		FS := os.DirFS(state.CWD)
+		matches, err := doublestar.Glob(FS, pattern)
 		if err != nil {
 			return false, "", hcl.Diagnostics{{
 				Severity: hcl.DiagError,
@@ -257,6 +274,7 @@ func (t *Task) run(log *log.Logger) hcl.Diagnostics {
 	%s`, t.Command)
 	// todo: use exec.CommandContext
 	command := exec.Command(terminal, "-c", script)
+	command.Env = config.AppendEnv(t.Env)
 	// todo: should this be configurable?
 	var stdout, stderr bytes.Buffer
 	command.Stdout = &stdout

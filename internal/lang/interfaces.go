@@ -22,7 +22,7 @@ type Address interface {
 type Action interface {
 	Address
 	values.Cty
-	Apply(config config.State) hcl.Diagnostics
+	Apply(config.State) hcl.Diagnostics
 	Hash() *config.Hash
 }
 

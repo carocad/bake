@@ -55,7 +55,11 @@ func (lock *Lock) Update(hashes []*Hash) {
 	lock.Version = info.Version
 	lock.Timestamp = time.Now()
 	for _, hash := range hashes {
-		if hash == nil || hash.Dirty || hash.Creates == "" {
+		if hash == nil {
+			continue
+		}
+
+		if hash.Dirty || hash.Creates == "" {
 			continue
 		}
 
@@ -83,8 +87,9 @@ func (lock *Lock) Store(cwd string) error {
 
 type Hash struct {
 	// Dirty flags a Hash as comming from a Task that might have not exit correctly
-	Dirty bool
-	Path  cty.Path `json:"_"`
+	Dirty bool `json:"-"`
+	// Path to identify the action this Hash came from
+	Path cty.Path `json:"-"`
 	// Creates keep a ref to the old filename in case it is renamed
 	Creates string
 	// Env hash just to check if it changes between executions

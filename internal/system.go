@@ -65,11 +65,6 @@ func Do(taskName string, s *config.State, addrs []lang.RawAddress) hcl.Diagnosti
 	coordinator := module.NewCoordinator(context.TODO(), *s)
 	start := time.Now()
 	actions, diags := coordinator.Do(task, addrs)
-	end := time.Now()
-	if !diags.HasErrors() {
-		fmt.Printf("\ndone in %s\n", end.Sub(start).String())
-	}
-
 	if !s.Flags.Dry && !s.Flags.Prune {
 		hashes := functional.Map(actions, func(action lang.Action) *config.Hash {
 			return action.Hash()
@@ -80,7 +75,11 @@ func Do(taskName string, s *config.State, addrs []lang.RawAddress) hcl.Diagnosti
 		if err != nil {
 			lang.NewLogger(task).Fatal(fmt.Errorf("error storing state: %w", err))
 		}
+
+		lang.NewLogger(task).Println(fmt.Errorf("state stored"))
 	}
 
+	end := time.Now()
+	fmt.Printf("\ndone in %s\n", end.Sub(start).String())
 	return diags
 }

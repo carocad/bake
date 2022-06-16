@@ -13,7 +13,7 @@ import (
 type State struct {
 	CWD string
 	// Context     context.Context TODO
-	Args        []string
+	args        []string
 	Flags       StateFlags
 	Parallelism uint8
 	Lock        *Lock
@@ -54,32 +54,42 @@ func NewState() (*State, error) {
 
 	return &State{
 		CWD:         cwd,
-		Args:        os.Args,
+		args:        os.Args,
 		Lock:        lock,
 		Parallelism: DefaultParallelism,
 	}, nil
 }
 
-func Env() map[string]string {
-	// organize out env vars
-	env := map[string]string{}
-	for _, keyVal := range os.Environ() {
-		parts := strings.SplitN(keyVal, "=", 2)
-		key, val := parts[0], parts[1]
-		env[key] = val
+// AppendEnv returns a slice of strings following the convention
+// from os.Environ
+func AppendEnv(env map[string]string) []string {
+	osEnv := os.Environ()
+	for k, v := range env {
+		osEnv = append(osEnv, k+"="+v)
+	}
+
+	return osEnv
+}
+
+func EnvSlice(input map[string]string) []string {
+	env := make([]string, 0)
+	for k, v := range input {
+		env = append(env, k+"="+v)
 	}
 
 	return env
 }
 
 func (state State) Context() *hcl.EvalContext {
-	args := make([]cty.Value, len(state.Args))
-	for index, arg := range state.Args {
+	args := make([]cty.Value, len(state.args))
+	for index, arg := range state.args {
 		args[index] = cty.StringVal(arg)
 	}
 
 	env := map[string]cty.Value{}
-	for key, val := range Env() {
+	for _, entry := range os.Environ() {
+		parts := strings.SplitN(entry, "=", 2)
+		key, val := parts[0], parts[1]
 		env[key] = cty.StringVal(val)
 	}
 
