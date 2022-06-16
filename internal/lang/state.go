@@ -17,7 +17,6 @@ import (
 type State struct {
 	CWD string
 	// Context     context.Context TODO
-	Env         map[string]string
 	Args        []string
 	Flags       StateFlags
 	Parallelism uint8
@@ -51,14 +50,6 @@ func NewState() (*State, error) {
 		return nil, err
 	}
 
-	// organize out env vars
-	env := map[string]string{}
-	for _, keyVal := range os.Environ() {
-		parts := strings.SplitN(keyVal, "=", 2)
-		key, val := parts[0], parts[1]
-		env[key] = val
-	}
-
 	// fetch state from filesystem
 	lock, err := lockFromFilesystem(cwd)
 	if err != nil {
@@ -67,11 +58,22 @@ func NewState() (*State, error) {
 
 	return &State{
 		CWD:         cwd,
-		Env:         env,
 		Args:        os.Args,
 		Lock:        lock,
 		Parallelism: DefaultParallelism,
 	}, nil
+}
+
+func Env() map[string]string {
+	// organize out env vars
+	env := map[string]string{}
+	for _, keyVal := range os.Environ() {
+		parts := strings.SplitN(keyVal, "=", 2)
+		key, val := parts[0], parts[1]
+		env[key] = val
+	}
+
+	return env
 }
 
 func (state State) Context(addr RawAddress, actions []Action) *hcl.EvalContext {

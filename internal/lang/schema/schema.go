@@ -22,12 +22,12 @@ const (
 
 // attributes
 const (
-	DependsOnAttr  = "depends_on"
-	CommandAttr    = "command"
-	CreatesAttr    = "creates"
-	SourcesAttr    = "sources"
-	DescripionAttr = "description"
-	ForEachAttr    = "for_each" // todo
+	DependsOnAttr   = "depends_on"
+	CommandAttr     = "command"
+	CreatesAttr     = "creates"
+	SourcesAttr     = "sources"
+	DescriptionAttr = "description"
+	ForEachAttr     = "for_each" // todo
 )
 
 var (
