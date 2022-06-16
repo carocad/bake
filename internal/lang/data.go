@@ -7,6 +7,7 @@ import (
 	"os/exec"
 	"strings"
 
+	"bake/internal/lang/schema"
 	"bake/internal/lang/values"
 
 	"github.com/hashicorp/hcl/v2"
@@ -35,7 +36,7 @@ func NewData(raw addressBlock, ctx *hcl.EvalContext) (*Data, hcl.Diagnostics) {
 func (d Data) CTY() cty.Value {
 	value := values.StructToCty(d)
 	m := value.AsValueMap()
-	m[NameLabel] = cty.StringVal(d.GetName())
+	m[schema.NameLabel] = cty.StringVal(d.GetName())
 	return cty.ObjectVal(m)
 }
 
@@ -90,7 +91,7 @@ func (d *Data) Apply(state State) hcl.Diagnostics {
 			Severity: hcl.DiagError,
 			Summary:  fmt.Sprintf(`"%s" command failed with exit code %d`, PathString(d.GetPath()), d.ExitCode.Int64),
 			Detail:   detail,
-			Subject:  GetRangeFor(d.Block, CommandAttr),
+			Subject:  schema.GetRangeFor(d.Block, schema.CommandAttr),
 			Context:  d.Block.DefRange.Ptr(),
 		}}
 	}

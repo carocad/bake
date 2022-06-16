@@ -1,6 +1,7 @@
 package lang
 
 import (
+	"bake/internal/lang/schema"
 	"bake/internal/lang/values"
 
 	"github.com/hashicorp/hcl/v2"
@@ -28,11 +29,11 @@ type RawAddress interface {
 
 func NewPartialAddress(block *hcl.Block) ([]RawAddress, hcl.Diagnostics) {
 	switch block.Type {
-	case DataLabel:
+	case schema.DataLabel:
 		return []RawAddress{addressBlock{
 			Block: block,
 		}}, nil
-	case TaskLabel:
+	case schema.TaskLabel:
 		diags := checkDescription(block)
 		if diags.HasErrors() {
 			return nil, diags
@@ -41,7 +42,7 @@ func NewPartialAddress(block *hcl.Block) ([]RawAddress, hcl.Diagnostics) {
 		return []RawAddress{addressBlock{
 			Block: block,
 		}}, nil
-	case LocalsLabel:
+	case schema.LocalsLabel:
 		attributes, diagnostics := block.Body.JustAttributes()
 		if diagnostics.HasErrors() {
 			return nil, diagnostics
@@ -51,7 +52,7 @@ func NewPartialAddress(block *hcl.Block) ([]RawAddress, hcl.Diagnostics) {
 		for name, attribute := range attributes {
 			addrs = append(addrs, addressAttribute{
 				name:  name,
-				label: LocalScope,
+				label: schema.LocalScope,
 				expr:  attribute.Expr,
 			})
 		}
@@ -60,6 +61,26 @@ func NewPartialAddress(block *hcl.Block) ([]RawAddress, hcl.Diagnostics) {
 	default:
 		return nil, nil
 	}
+}
+
+func checkDescription(block *hcl.Block) hcl.Diagnostics {
+	attrs, diags := block.Body.JustAttributes()
+	if diags.HasErrors() {
+		return diags
+	}
+
+	for _, attr := range attrs {
+		if attr.Name != schema.DescripionAttr {
+			continue
+		}
+
+		_, diags := attr.Expr.Value(nil)
+		if diags.HasErrors() {
+			return diags
+		}
+	}
+
+	return nil
 }
 
 type addressBlock struct {
@@ -75,7 +96,7 @@ func (n addressBlock) GetName() string {
 }
 
 func (n addressBlock) GetPath() cty.Path {
-	if n.Block.Type == TaskLabel {
+	if n.Block.Type == schema.TaskLabel {
 		return cty.GetAttrPath(n.GetName())
 	}
 
@@ -98,14 +119,14 @@ func (n addressBlock) Dependencies() ([]hcl.Traversal, hcl.Diagnostics) {
 
 func (n addressBlock) Decode(ctx *hcl.EvalContext) ([]Action, hcl.Diagnostics) {
 	switch n.Block.Type {
-	case TaskLabel:
+	case schema.TaskLabel:
 		task, diagnostics := NewTask(n, ctx)
 		if diagnostics.HasErrors() {
 			return nil, diagnostics
 		}
 
 		return []Action{task}, nil
-	case DataLabel:
+	case schema.DataLabel:
 		data, diagnostics := NewData(n, ctx)
 		if diagnostics.HasErrors() {
 			return nil, diagnostics
@@ -122,7 +143,7 @@ type CliCommand struct{ Name, Description string }
 func GetPublicTasks(addrs []RawAddress) []CliCommand {
 	commands := make([]CliCommand, 0)
 	for _, addr := range addrs {
-		if IsKnownPrefix(addr.GetPath()) {
+		if schema.IsKnownPrefix(addr.GetPath()) {
 			continue
 		}
 
@@ -137,7 +158,7 @@ func GetPublicTasks(addrs []RawAddress) []CliCommand {
 			continue
 		}
 
-		attr, ok := attrs[DescripionAttr]
+		attr, ok := attrs[schema.DescripionAttr]
 		if !ok {
 			continue
 		}

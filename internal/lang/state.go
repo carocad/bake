@@ -2,6 +2,7 @@ package lang
 
 import (
 	"bake/internal/concurrent"
+	"bake/internal/lang/schema"
 	"fmt"
 	"log"
 	"os"
@@ -90,23 +91,23 @@ func (state State) Context(addr RawAddress, actions []Action) *hcl.EvalContext {
 		path := act.GetPath()
 		value := act.CTY()
 		switch {
-		case path.HasPrefix(DataPrefix):
+		case path.HasPrefix(schema.DataPrefix):
 			data[name] = value
-		case path.HasPrefix(LocalPrefix):
+		case path.HasPrefix(schema.LocalPrefix):
 			local[name] = value
 		default:
 			task[name] = value
 		}
 	}
 
-	variables[DataLabel] = cty.ObjectVal(data)
-	variables[LocalScope] = cty.ObjectVal(local)
-	variables[TaskLabel] = cty.ObjectVal(task)
+	variables[schema.DataLabel] = cty.ObjectVal(data)
+	variables[schema.LocalScope] = cty.ObjectVal(local)
+	variables[schema.TaskLabel] = cty.ObjectVal(task)
 	// allow tasks to be referred without a prefix
 	concurrent.Merge(variables, task)
 	return &hcl.EvalContext{
 		Variables: variables,
-		Functions: Functions(),
+		Functions: schema.Functions(),
 	}
 }
 

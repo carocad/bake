@@ -10,6 +10,7 @@ import (
 	"strings"
 	"time"
 
+	"bake/internal/lang/schema"
 	"bake/internal/lang/values"
 
 	"github.com/hashicorp/hcl/v2"
@@ -79,10 +80,7 @@ func (t Task) GetFilename() string {
 }
 
 func (t Task) CTY() cty.Value {
-	value := values.StructToCty(t)
-	m := value.AsValueMap()
-	m[NameLabel] = cty.StringVal(t.GetName())
-	return cty.ObjectVal(m)
+	return values.StructToCty(t)
 }
 
 func (t *Task) Apply(state State) hcl.Diagnostics {
@@ -321,6 +319,30 @@ func (t *Task) prune(log *log.Logger) hcl.Diagnostics {
 			Detail:   err.Error(),
 			Subject:  &t.metadata.Creates,
 			Context:  &t.metadata.Block,
+		}}
+	}
+
+	return nil
+}
+
+func checkDependsOn(body hcl.Body) hcl.Diagnostics {
+	attrs, diags := body.JustAttributes()
+	if diags.HasErrors() {
+		return diags
+	}
+
+	for _, attr := range attrs {
+		if attr.Name == schema.DependsOnAttr {
+			_, diags := schema.TupleOfReferences(attrs[schema.DependsOnAttr])
+			return diags
+		}
+
+		// only depends on is allowed
+		return hcl.Diagnostics{{
+			Severity: hcl.DiagError,
+			Summary:  "Unsupported argument",
+			Detail:   fmt.Sprintf(`An argument named "%s" is not expected here`, attr.Name),
+			Subject:  attr.Expr.Range().Ptr(),
 		}}
 	}
 

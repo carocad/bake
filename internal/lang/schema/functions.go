@@ -1,4 +1,4 @@
-package lang
+package schema
 
 import (
 	"github.com/zclconf/go-cty/cty/function"

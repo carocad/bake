@@ -6,6 +6,7 @@ import (
 	"bake/internal/concurrent"
 	"bake/internal/functional"
 	"bake/internal/lang"
+	"bake/internal/lang/schema"
 
 	"github.com/hashicorp/hcl/v2"
 )
@@ -136,7 +137,7 @@ func getByPrefix[T lang.Address](traversal hcl.Traversal, addresses map[string]T
 
 func ignoreRef(traversal hcl.Traversal) bool {
 	traversalPath := lang.ToPath(traversal)
-	for _, path := range lang.GlobalPrefixes.List() {
+	for _, path := range schema.GlobalPrefixes.List() {
 		if traversalPath.HasPrefix(path) {
 			return true
 		}

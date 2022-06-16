@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"bake/internal/lang"
+	"bake/internal/lang/schema"
 	"bake/internal/module"
 
 	"github.com/hashicorp/hcl/v2"
@@ -36,7 +37,7 @@ func ReadRecipes(cwd string, parser *hclparse.Parser) ([]lang.RawAddress, hcl.Di
 			return nil, diags
 		}
 
-		content, diags := f.Body.Content(lang.FileSchema())
+		content, diags := f.Body.Content(schema.FileSchema())
 		if diags.HasErrors() {
 			return nil, diags
 		}
