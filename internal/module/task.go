@@ -10,7 +10,7 @@ import (
 
 func GetTask(name string, addresses []lang.RawAddress) (lang.RawAddress, hcl.Diagnostics) {
 	for _, address := range addresses {
-		if lang.PathString(address.GetPath()) != name {
+		if lang.AddressToString(address) != name {
 			continue
 		}
 

@@ -50,7 +50,7 @@ func (s fakeAddress) CTY() cty.Value {
 }
 
 func (s fakeAddress) Plan(state lang.State) (bool, string, hcl.Diagnostics) {
-	return true, fmt.Sprintf(`refreshing "%s"`, lang.PathString(s.GetPath())), nil
+	return true, fmt.Sprintf(`refreshing "%s"`, lang.AddressToString(s)), nil
 }
 
 func (s fakeAddress) Apply(state lang.State) hcl.Diagnostics {

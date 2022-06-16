@@ -89,7 +89,7 @@ func (d *Data) Apply(state State) hcl.Diagnostics {
 	if err != nil {
 		return hcl.Diagnostics{{
 			Severity: hcl.DiagError,
-			Summary:  fmt.Sprintf(`"%s" command failed with exit code %d`, PathString(d.GetPath()), d.ExitCode.Int64),
+			Summary:  fmt.Sprintf(`"%s" command failed with exit code %d`, AddressToString(d), d.ExitCode.Int64),
 			Detail:   detail,
 			Subject:  schema.GetRangeFor(d.Block, schema.CommandAttr),
 			Context:  d.Block.DefRange.Ptr(),

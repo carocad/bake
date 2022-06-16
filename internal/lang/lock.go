@@ -61,7 +61,7 @@ func (lock *Lock) Update(actions []Action) {
 		}
 
 		if ok && task.ExitCode.Valid && task.ExitCode.Int64 == 0 && task.Creates != "" {
-			lock.Tasks[PathString(task.GetPath())] = NewTaskHash(*task)
+			lock.Tasks[AddressToString(task)] = NewTaskHash(*task)
 		}
 	}
 }

@@ -27,6 +27,10 @@ type RawAddress interface {
 	Decode(ctx *hcl.EvalContext) ([]Action, hcl.Diagnostics)
 }
 
+func AddressToString[T Address](addr T) string {
+	return schema.PathString(addr.GetPath())
+}
+
 func NewPartialAddress(block *hcl.Block) ([]RawAddress, hcl.Diagnostics) {
 	switch block.Type {
 	case schema.DataLabel:

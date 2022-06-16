@@ -10,6 +10,7 @@ import (
 	"strings"
 	"time"
 
+	"bake/internal/lang/meta"
 	"bake/internal/lang/schema"
 	"bake/internal/lang/values"
 
@@ -42,13 +43,13 @@ type TaskMetadata struct {
 }
 
 func NewTask(raw addressBlock, ctx *hcl.EvalContext) (*Task, hcl.Diagnostics) {
-	meta := TaskMetadata{Block: raw.Block.DefRange}
-	diags := DecodeRange(raw.Block.Body, ctx, &meta)
+	t := TaskMetadata{Block: raw.Block.DefRange}
+	diags := meta.DecodeRange(raw.Block.Body, ctx, &t)
 	if diags.HasErrors() {
 		return nil, diags
 	}
 
-	task := &Task{Name: raw.GetName(), metadata: meta}
+	task := &Task{Name: raw.GetName(), metadata: t}
 	diags = gohcl.DecodeBody(raw.Block.Body, ctx, task)
 	if diags.HasErrors() {
 		return nil, diags
@@ -269,7 +270,7 @@ func (t *Task) run(log *log.Logger) hcl.Diagnostics {
 	if err != nil {
 		return hcl.Diagnostics{{
 			Severity: hcl.DiagError,
-			Summary:  fmt.Sprintf(`"%s" task failed with exit code %d`, PathString(t.GetPath()), t.ExitCode.Int64),
+			Summary:  fmt.Sprintf(`"%s" task failed with exit code %d`, AddressToString(t), t.ExitCode.Int64),
 			Detail:   detail,
 			Subject:  &t.metadata.Command,
 			Context:  &t.metadata.Block,
@@ -284,7 +285,7 @@ func (t *Task) run(log *log.Logger) hcl.Diagnostics {
 	if err != nil {
 		return hcl.Diagnostics{{
 			Severity: hcl.DiagError,
-			Summary:  fmt.Sprintf(`"%s" didn't create the expected file "%s"`, PathString(t.GetPath()), t.Creates),
+			Summary:  fmt.Sprintf(`"%s" didn't create the expected file "%s"`, AddressToString(t), t.Creates),
 			Subject:  &t.metadata.Creates,
 			Context:  &t.metadata.Block,
 		}}

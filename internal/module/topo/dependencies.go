@@ -48,7 +48,7 @@ func Dependencies[T lang.RawAddress](addr T, addresses []T) ([]T, hcl.Diagnostic
 		mapping[lang.AddressToString(address)] = address
 	}
 
-	path := lang.PathString(addr.GetPath())
+	path := lang.AddressToString(addr)
 	markers := map[string]marker{
 		path: unmarked,
 	}
@@ -114,7 +114,7 @@ func visit[T lang.RawAddress](current string, markers map[string]marker, address
 }
 
 func getByPrefix[T lang.Address](traversal hcl.Traversal, addresses map[string]T) (*T, hcl.Diagnostics) {
-	path := lang.ToPath(traversal)
+	path := schema.ToPath(traversal)
 	for _, address := range addresses {
 		if path.HasPrefix(address.GetPath()) {
 			return &address, nil
@@ -122,7 +122,7 @@ func getByPrefix[T lang.Address](traversal hcl.Traversal, addresses map[string]T
 	}
 
 	options := functional.Map(functional.Values(addresses), lang.AddressToString[T])
-	suggestion := functional.Suggest(lang.PathString(path), options)
+	suggestion := functional.Suggest(schema.PathString(path), options)
 	summary := "unknown reference"
 	if suggestion != "" {
 		summary += fmt.Sprintf(`. Did you mean "%s"?`, suggestion)
@@ -136,7 +136,7 @@ func getByPrefix[T lang.Address](traversal hcl.Traversal, addresses map[string]T
 }
 
 func ignoreRef(traversal hcl.Traversal) bool {
-	traversalPath := lang.ToPath(traversal)
+	traversalPath := schema.ToPath(traversal)
 	for _, path := range schema.GlobalPrefixes.List() {
 		if traversalPath.HasPrefix(path) {
 			return true

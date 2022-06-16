@@ -1,4 +1,4 @@
-package lang
+package schema
 
 import (
 	"fmt"
@@ -49,8 +49,4 @@ func PathString(path cty.Path) string {
 	}
 
 	return result
-}
-
-func AddressToString[T Address](addr T) string {
-	return PathString(addr.GetPath())
 }

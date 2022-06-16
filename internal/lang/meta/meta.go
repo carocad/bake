@@ -1,4 +1,4 @@
-package lang
+package meta
 
 import (
 	"bake/internal/concurrent"
