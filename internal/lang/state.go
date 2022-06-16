@@ -20,6 +20,7 @@ type State struct {
 	Args        []string
 	Flags       StateFlags
 	Parallelism uint8
+	Lock        *Lock
 }
 
 type StateFlags struct {
@@ -57,10 +58,17 @@ func NewState() (*State, error) {
 		env[key] = val
 	}
 
+	// fetch state from filesystem
+	lock, err := lockFromFilesystem(cwd)
+	if err != nil {
+		return nil, err
+	}
+
 	return &State{
 		CWD:         cwd,
 		Env:         env,
 		Args:        os.Args,
+		Lock:        lock,
 		Parallelism: DefaultParallelism,
 	}, nil
 }

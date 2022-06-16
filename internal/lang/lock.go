@@ -1,4 +1,4 @@
-package internal
+package lang
 
 import (
 	"encoding/json"
@@ -8,7 +8,6 @@ import (
 	"strconv"
 	"time"
 
-	"bake/internal/lang"
 	"bake/internal/lang/info"
 )
 
@@ -23,14 +22,6 @@ type Lock struct {
 	Tasks     map[string]TaskHash
 }
 
-type TaskHash struct {
-	// Creates keep a ref to the old filename in case it is renamed
-	Creates string
-	// hash the env and the command in case they change
-	// Env     string TODO
-	Command string
-}
-
 func newLock() *Lock {
 	return &Lock{
 		Version:   info.Version,
@@ -39,7 +30,7 @@ func newLock() *Lock {
 	}
 }
 
-func readLock(cwd string) (*Lock, error) {
+func lockFromFilesystem(cwd string) (*Lock, error) {
 	lockPath := filepath.Join(cwd, BakeDirPath, BakeLockFilename)
 	_, err := os.Stat(lockPath)
 	if err != nil {
@@ -60,26 +51,22 @@ func readLock(cwd string) (*Lock, error) {
 	return &lock, nil
 }
 
-func (lock *Lock) update(actions []lang.Action) {
+func (lock *Lock) Update(actions []Action) {
 	lock.Version = info.Version
 	lock.Timestamp = time.Now()
 	for _, action := range actions {
-		task, ok := action.(*lang.Task)
-		if ok && task.ExitCode.Int64 == 0 && task.Creates != "" {
-			lock.Tasks[lang.PathString(task.GetPath())] = HashTask(task)
+		task, ok := action.(*Task)
+		if !ok {
+			continue
+		}
+
+		if ok && task.ExitCode.Valid && task.ExitCode.Int64 == 0 && task.Creates != "" {
+			lock.Tasks[PathString(task.GetPath())] = NewTaskHash(*task)
 		}
 	}
 }
 
-func HashTask(task *lang.Task) TaskHash {
-	checksum := crc64.Checksum([]byte(task.Command), crc64.MakeTable(crc64.ISO))
-	return TaskHash{
-		Creates: task.Creates,
-		Command: strconv.FormatUint(checksum, 16),
-	}
-}
-
-func (lock *Lock) store(cwd string) error {
+func (lock *Lock) Store(cwd string) error {
 	statePath := filepath.Join(cwd, BakeDirPath, BakeLockFilename)
 	err := os.MkdirAll(filepath.Dir(statePath), 0770)
 	if err != nil {
@@ -95,4 +82,20 @@ func (lock *Lock) store(cwd string) error {
 	encoder := json.NewEncoder(file)
 	encoder.SetIndent("", "  ")
 	return encoder.Encode(lock)
+}
+
+type TaskHash struct {
+	// Creates keep a ref to the old filename in case it is renamed
+	Creates string
+	// hash the env and the command in case they change
+	// Env     string TODO
+	Command string
+}
+
+func NewTaskHash(task Task) TaskHash {
+	checksum := crc64.Checksum([]byte(task.Command), crc64.MakeTable(crc64.ISO))
+	return TaskHash{
+		Creates: task.Creates,
+		Command: strconv.FormatUint(checksum, 16),
+	}
 }

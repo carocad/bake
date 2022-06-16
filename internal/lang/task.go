@@ -86,7 +86,7 @@ func (t Task) CTY() cty.Value {
 }
 
 func (t *Task) Apply(state State) hcl.Diagnostics {
-	// dont apply twice in case more than 1 task depends on this
+	// don't apply twice in case more than 1 task depends on this
 	if t.ExitCode.Valid || t.Command == "" {
 		return nil
 	}
@@ -125,12 +125,51 @@ func (t *Task) Apply(state State) hcl.Diagnostics {
 		return nil
 	}
 
-	return t.run(log)
+	diags = t.run(log)
+	if diags.HasErrors() {
+		return diags
+	}
+
+	// do we need to prune old stuff?
+	oldHash, ok := state.Lock.Tasks[AddressToString(t)]
+	if !ok {
+		return nil
+	}
+
+	hash := NewTaskHash(*t)
+	if hash.Creates == oldHash.Creates {
+		return nil
+	}
+
+	err := os.RemoveAll(oldHash.Creates)
+	if err != nil {
+		return hcl.Diagnostics{{
+			Severity: hcl.DiagError,
+			Summary:  fmt.Sprintf(`error pruning %s task's old "creates": %s`, AddressToString(t), oldHash.Creates),
+			Detail:   err.Error(),
+			Subject:  &t.metadata.Creates,
+			Context:  &t.metadata.Block,
+		}}
+	}
+
+	return nil
 }
 
 func (t Task) dryRun(state State) (shouldApply bool, reason string, diags hcl.Diagnostics) {
 	if state.Flags.Force {
 		return true, "force run is in effect", nil
+	}
+
+	oldHash, ok := state.Lock.Tasks[AddressToString(t)]
+	if ok {
+		hash := NewTaskHash(t)
+		if hash.Creates != oldHash.Creates {
+			return true, `"creates" has changed ... baking`, nil
+		}
+
+		if hash.Command != oldHash.Command {
+			return true, `"command" has changed ... baking`, nil
+		}
 	}
 
 	if t.Command == "" && t.Creates != "" {
@@ -225,6 +264,7 @@ func (t *Task) run(log *log.Logger) hcl.Diagnostics {
 
 	detail := strings.TrimSpace(stderr.String())
 	if detail == "" {
+		// just in case the program didn't output anything to std err
 		detail = strings.TrimSpace(stdout.String())
 	}
 

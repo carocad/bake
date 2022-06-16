@@ -53,49 +53,25 @@ func ReadRecipes(cwd string, parser *hclparse.Parser) ([]lang.RawAddress, hcl.Di
 	return addresses, nil
 }
 
-func Do(taskName string, config *lang.State, addrs []lang.RawAddress) hcl.Diagnostics {
+func Do(taskName string, state *lang.State, addrs []lang.RawAddress) hcl.Diagnostics {
 	task, diags := module.GetTask(taskName, addrs)
 	if diags.HasErrors() {
 		return diags
 	}
 
-	coordinator := module.NewCoordinator(context.TODO(), *config)
-	log := config.NewLogger(task)
+	coordinator := module.NewCoordinator(context.TODO(), *state)
 	start := time.Now()
 	actions, diags := coordinator.Do(task, addrs)
 	end := time.Now()
-	log.Printf(`done in %s`, end.Sub(start).String())
-	if diags.HasErrors() {
-		return diags
+	fmt.Printf("\ndone in %s\n", end.Sub(start).String())
+
+	if !state.Flags.Dry && !state.Flags.Prune {
+		state.Lock.Update(actions)
+		err := state.Lock.Store(state.CWD)
+		if err != nil {
+			state.NewLogger(task).Fatal(fmt.Errorf("error storing state: %w", err))
+		}
 	}
 
-	fmt.Print(1)
-	if config.Flags.Dry || config.Flags.Prune {
-		return nil
-	}
-
-	fmt.Print(2)
-	lock, err := readLock(config.CWD)
-	if err != nil {
-		fmt.Print(21)
-		return hcl.Diagnostics{{
-			Severity: hcl.DiagError,
-			Summary:  "error reading lock",
-			Detail:   err.Error(),
-		}}
-	}
-
-	fmt.Print(3)
-	lock.update(actions)
-	err = lock.store(config.CWD)
-	if err != nil {
-		return hcl.Diagnostics{{
-			Severity: hcl.DiagError,
-			Summary:  "error storing state",
-			Detail:   err.Error(),
-		}}
-	}
-
-	fmt.Print(4)
-	return nil
+	return diags
 }
