@@ -4,7 +4,7 @@ Declarative tasks orchestration
 
 ## target "picture"
 
-- ⌛ automatically clean up running tasks on sig int
+- ✅ automatically clean up running tasks on sig int
 - ✅ data tasks
   - ✅ fetch state information necessary to run the tasks
 - ✅ list (public) tasks:
@@ -24,9 +24,11 @@ Declarative tasks orchestration
   - ✅ resolve all data and locals
   - ✅ run the tasks in dependency order
 - ✅ prune targets:
-  - ✅ removes all files created by any target 
+  - ✅ removes all files created by any target
 - watch a (public) target:
   - run or dry-run a target task
 - cache targets of a recipe
   - store all target results in a zip file
   - store all targets hashes in a state file
+- ❓ how to handle "system" dependencies?
+  - for example: how should bake react if "go" is updated between executions?
