@@ -2,6 +2,7 @@ package lang
 
 import (
 	"bytes"
+	"context"
 	"fmt"
 	"log"
 	"os"
@@ -16,7 +17,7 @@ import (
 	"github.com/hashicorp/hcl/v2"
 )
 
-func (t Task) dryRun(state config.State) (shouldApply bool, reason string, diags hcl.Diagnostics) {
+func (t Task) dryRun(state *config.State) (shouldApply bool, reason string, diags hcl.Diagnostics) {
 	if state.Flags.Force {
 		return true, "force run is in effect", nil
 	}
@@ -93,7 +94,7 @@ func (t Task) dryRun(state config.State) (shouldApply bool, reason string, diags
 	return false, fmt.Sprintf(`"%s" is newer than "%s" ... skipping`, t.Creates, strings.Join(t.Sources, "")), nil
 }
 
-func (t *Task) run(log *log.Logger) hcl.Diagnostics {
+func (t *Task) run(ctx context.Context, log *log.Logger) hcl.Diagnostics {
 	// determine which shell to use
 	terminal := "bash"
 	shell, ok := os.LookupEnv("SHELL")
@@ -106,8 +107,7 @@ func (t *Task) run(log *log.Logger) hcl.Diagnostics {
 	set -euo pipefail
 
 	%s`, t.Command)
-	// todo: use exec.CommandContext
-	command := exec.Command(terminal, "-c", script)
+	command := exec.CommandContext(ctx, terminal, "-c", script)
 	command.Env = config.EnvSlice(t.Env)
 	// todo: should this be configurable?
 	var stdout, stderr bytes.Buffer
@@ -134,7 +134,7 @@ func (t *Task) run(log *log.Logger) hcl.Diagnostics {
 	if err != nil {
 		return hcl.Diagnostics{{
 			Severity: hcl.DiagError,
-			Summary:  fmt.Sprintf(`"%s" task failed with exit code %d`, AddressToString(t), t.ExitCode.Int64),
+			Summary:  fmt.Sprintf(`"%s" task failed with "%s"`, AddressToString(t), command.ProcessState.String()),
 			Detail:   detail,
 			Subject:  &t.metadata.Command,
 			Context:  &t.metadata.Block,

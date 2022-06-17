@@ -2,10 +2,12 @@ package lang
 
 import (
 	"bytes"
+	"context"
 	"fmt"
 	"os"
 	"os/exec"
 	"strings"
+	"time"
 
 	"bake/internal/concurrent"
 	"bake/internal/lang/config"
@@ -50,7 +52,7 @@ func (d Data) Hash() *config.Hash {
 	return nil
 }
 
-func (d *Data) Apply(state config.State) hcl.Diagnostics {
+func (d *Data) Apply(ctx context.Context, state *config.State) hcl.Diagnostics {
 	if d.ExitCode.Valid { // apply data even on dry run
 		return nil
 	}
@@ -69,13 +71,15 @@ func (d *Data) Apply(state config.State) hcl.Diagnostics {
 	set -euo pipefail
 
 	%s`, d.Command)
-	command := exec.Command(terminal, "-c", script)
+	command := exec.CommandContext(ctx, terminal, "-c", script)
 	command.Env = config.EnvSlice(d.Env)
 	// todo: should I allow configuring these?
 	var stdout, stderr bytes.Buffer
 	command.Stdout = &stdout
 	command.Stderr = &stderr
+	start := time.Now()
 	err := command.Run()
+	end := time.Now()
 	// store results
 	d.StdOut = values.EventualString{
 		String: strings.TrimSpace(stdout.String()),
@@ -100,13 +104,13 @@ func (d *Data) Apply(state config.State) hcl.Diagnostics {
 	if err != nil {
 		return hcl.Diagnostics{{
 			Severity: hcl.DiagError,
-			Summary:  fmt.Sprintf(`"%s" command failed with exit code %d`, AddressToString(d), d.ExitCode.Int64),
+			Summary:  fmt.Sprintf(`"%s" command failed with: %s`, AddressToString(d), command.ProcessState.String()),
 			Detail:   detail,
 			Subject:  schema.GetRangeFor(d.Block, schema.CommandAttr),
 			Context:  d.Block.DefRange.Ptr(),
 		}}
 	}
 
-	log.Println(`done in ` + command.ProcessState.UserTime().String())
+	log.Println(`done in ` + end.Sub(start).String())
 	return nil
 }

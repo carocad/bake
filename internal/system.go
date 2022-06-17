@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"io/ioutil"
 	"path/filepath"
-	"time"
 
 	"bake/internal/functional"
 	"bake/internal/lang"
@@ -56,30 +55,54 @@ func ReadRecipes(cwd string, parser *hclparse.Parser) ([]lang.RawAddress, hcl.Di
 	return addresses, nil
 }
 
-func Do(taskName string, s *config.State, addrs []lang.RawAddress) hcl.Diagnostics {
-	task, diags := module.GetTask(taskName, addrs)
+func Do(ctx context.Context, taskName string, state *config.State, addrs []lang.RawAddress) hcl.Diagnostics {
+	task, diags := getTask(taskName, addrs)
 	if diags.HasErrors() {
 		return diags
 	}
 
-	coordinator := module.NewCoordinator(context.TODO(), *s)
-	start := time.Now()
-	actions, diags := coordinator.Do(task, addrs)
-	if !s.Flags.Dry && !s.Flags.Prune {
-		hashes := functional.Map(actions, func(action lang.Action) *config.Hash {
-			return action.Hash()
-		})
-
-		s.Lock.Update(hashes)
-		err := s.Lock.Store(s.CWD)
-		if err != nil {
-			lang.NewLogger(task).Fatal(fmt.Errorf("error storing state: %w", err))
-		}
-
-		lang.NewLogger(task).Println(fmt.Errorf("state stored"))
+	coordinator := module.NewCoordinator(ctx, int(state.Parallelism))
+	actions, diags := coordinator.Do(state, task, addrs)
+	if state.Flags.Dry || state.Flags.Prune {
+		return diags
 	}
 
-	end := time.Now()
-	fmt.Printf("\ndone in %s\n", end.Sub(start).String())
+	hashes := make([]*config.Hash, len(actions))
+	for index, action := range actions {
+		hashes[index] = action.Hash()
+	}
+
+	state.Lock.Update(hashes)
+	err := state.Lock.Store(state.CWD)
+	if err != nil {
+		diags.Append(&hcl.Diagnostic{
+			Severity: hcl.DiagError,
+			Summary:  "error storing state",
+			Detail:   err.Error(),
+		})
+	}
+
 	return diags
+}
+
+func getTask(name string, addresses []lang.RawAddress) (lang.RawAddress, hcl.Diagnostics) {
+	for _, address := range addresses {
+		if lang.AddressToString(address) != name {
+			continue
+		}
+
+		return address, nil
+	}
+
+	options := functional.Map(addresses, lang.AddressToString[lang.RawAddress])
+	suggestion := functional.Suggest(name, options)
+	summary := "couldn't find any target with name " + name
+	if suggestion != "" {
+		summary += fmt.Sprintf(`. Did you mean "%s"`, suggestion)
+	}
+
+	return nil, hcl.Diagnostics{{
+		Severity: hcl.DiagError,
+		Summary:  summary,
+	}}
 }

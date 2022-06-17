@@ -58,7 +58,7 @@ func (s fakeAddress) Plan(state config.State) (bool, string, hcl.Diagnostics) {
 	return true, fmt.Sprintf(`refreshing "%s"`, lang.AddressToString(s)), nil
 }
 
-func (s fakeAddress) Apply(state config.State) hcl.Diagnostics {
+func (s fakeAddress) Apply(ctx context.Context, state *config.State) hcl.Diagnostics {
 	time.Sleep(200 * time.Millisecond)
 	return nil
 }
@@ -71,14 +71,14 @@ func TestSerialCoordination(t *testing.T) {
 		data = append(data, fakeAddress{value, preData[:index]})
 	}
 
-	eval, err := config.NewState()
+	state, err := config.NewState()
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	coordinator := NewCoordinator(context.TODO(), *eval)
+	coordinator := NewCoordinator(context.TODO(), int(state.Parallelism))
 	start := time.Now()
-	actions, diags := coordinator.Do(data[len(data)-1], data)
+	actions, diags := coordinator.Do(state, data[len(data)-1], data)
 	if diags.HasErrors() {
 		t.Fatal(diags)
 	}
@@ -106,14 +106,14 @@ func TestParallelCoordination(t *testing.T) {
 		data = append(data, fakeAddress{value, nil})
 	}
 
-	eval, err := config.NewState()
+	state, err := config.NewState()
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	coordinator := NewCoordinator(context.TODO(), *eval)
+	coordinator := NewCoordinator(context.TODO(), int(state.Parallelism))
 	start := time.Now()
-	_, diags := coordinator.Do(data[len(data)-1], data)
+	_, diags := coordinator.Do(state, data[len(data)-1], data)
 	if diags.HasErrors() {
 		t.Fatal(diags)
 	}
@@ -140,14 +140,14 @@ func TestCustomCoordination(t *testing.T) {
 	}}
 
 	addresses := functional.Map(data, func(f fakeAddress) lang.RawAddress { return f })
-	eval, err := config.NewState()
+	state, err := config.NewState()
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	coordinator := NewCoordinator(context.TODO(), *eval)
+	coordinator := NewCoordinator(context.TODO(), int(state.Parallelism))
 	start := time.Now()
-	actions, diags := coordinator.Do(data[len(data)-1], addresses)
+	actions, diags := coordinator.Do(state, data[len(data)-1], addresses)
 	if diags.HasErrors() {
 		t.Fatal(diags)
 	}

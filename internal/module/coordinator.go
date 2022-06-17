@@ -73,25 +73,25 @@ type Coordinator struct {
 	pool    *errgroup.Group
 	waiting *concurrent.Map[lang.Address, *sync.WaitGroup]
 	actions *concurrent.Slice[lang.Action]
-	state   config.State
+	ctx     context.Context
 }
 
-func NewCoordinator(ctx context.Context, eval config.State) Coordinator {
+func NewCoordinator(ctx context.Context, parallelism int) Coordinator {
 	// todo: do I need to return the context?
-	bounded, _ := errgroup.WithContext(ctx)
-	bounded.SetLimit(int(eval.Parallelism))
+	bounded, ctx := errgroup.WithContext(ctx)
+	bounded.SetLimit(parallelism)
 	return Coordinator{
 		pool:    bounded,
 		waiting: concurrent.NewMapBy[lang.Address, *sync.WaitGroup](lang.AddressToString[lang.Address]),
 		actions: concurrent.NewSlice[lang.Action](),
-		state:   eval,
+		ctx:     ctx,
 	}
 }
 
 // Do task with id on a separate go routine after its dependencies are done. All dependencies MUST
 // have a previously registered task, otherwise the entire task coordinator
 // is stopped and an error is returned
-func (coordinator *Coordinator) Do(task lang.RawAddress, addresses []lang.RawAddress) ([]lang.Action, hcl.Diagnostics) {
+func (coordinator *Coordinator) Do(state *config.State, task lang.RawAddress, addresses []lang.RawAddress) ([]lang.Action, hcl.Diagnostics) {
 	allDependencies, diags := topo.AllDependencies(task, addresses)
 	if diags.HasErrors() {
 		return nil, diags
@@ -112,8 +112,11 @@ func (coordinator *Coordinator) Do(task lang.RawAddress, addresses []lang.RawAdd
 			return nil, diags
 		}
 
-		// evalContext := coordinator.state.Context(address, coordinator.actions.Items())
-		evalContext := coordinator.context(address, coordinator.actions.Items())
+		evalContext := state.EvalContext()
+		evalContext.Variables = concurrent.Merge(
+			pathContext(state, address),
+			actionsContext(coordinator.actions.Items()),
+		)
 		actions, diags := address.Decode(evalContext)
 		if diags.HasErrors() {
 			return nil, diags
@@ -130,7 +133,7 @@ func (coordinator *Coordinator) Do(task lang.RawAddress, addresses []lang.RawAdd
 			coordinator.pool.Go(func() error {
 				defer promise.Done()
 
-				diags := action.Apply(coordinator.state)
+				diags := action.Apply(coordinator.ctx, state)
 				// todo: display the time it took to apply the action
 				if diags.HasErrors() {
 					return diags
@@ -166,19 +169,19 @@ func (coordinator *Coordinator) waitFor(dependencies []lang.RawAddress) hcl.Diag
 	return nil
 }
 
-func (coordinator *Coordinator) context(addr lang.Address, actions []lang.Action) *hcl.EvalContext {
-	parent := coordinator.state.Context()
-	child := parent.NewChild()
-
-	cwd := coordinator.state.CWD
-	variables := map[string]cty.Value{
+func pathContext(state *config.State, addr lang.Address) map[string]cty.Value {
+	cwd := state.CWD
+	return map[string]cty.Value{
 		"path": cty.ObjectVal(map[string]cty.Value{
 			"root":    cty.StringVal(cwd),
 			"module":  cty.StringVal(filepath.Join(cwd, filepath.Dir(addr.GetFilename()))),
 			"current": cty.StringVal(filepath.Join(cwd, addr.GetFilename())),
 		}),
 	}
+}
 
+func actionsContext(actions []lang.Action) map[string]cty.Value {
+	variables := map[string]cty.Value{}
 	data := map[string]cty.Value{}
 	local := map[string]cty.Value{}
 	task := map[string]cty.Value{}
@@ -202,6 +205,5 @@ func (coordinator *Coordinator) context(addr lang.Address, actions []lang.Action
 	// allow tasks to be referred without a prefix
 	concurrent.Merge(variables, task)
 
-	child.Variables = variables
-	return child
+	return variables
 }

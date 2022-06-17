@@ -4,6 +4,7 @@ import (
 	"bake/internal/lang/config"
 	"bake/internal/lang/schema"
 	"bake/internal/lang/values"
+	"context"
 	"log"
 	"os"
 
@@ -22,7 +23,7 @@ type Address interface {
 type Action interface {
 	Address
 	values.Cty
-	Apply(config.State) hcl.Diagnostics
+	Apply(context.Context, *config.State) hcl.Diagnostics
 	Hash() *config.Hash
 }
 

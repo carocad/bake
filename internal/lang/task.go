@@ -1,6 +1,7 @@
 package lang
 
 import (
+	"context"
 	"fmt"
 	"hash/crc64"
 	"os"
@@ -102,7 +103,7 @@ func (t Task) Hash() *config.Hash {
 	}
 }
 
-func (t *Task) Apply(state config.State) hcl.Diagnostics {
+func (t *Task) Apply(ctx context.Context, state *config.State) hcl.Diagnostics {
 	// don't apply twice in case more than 1 task depends on this
 	if t.ExitCode.Valid || t.Command == "" {
 		return nil
@@ -142,7 +143,7 @@ func (t *Task) Apply(state config.State) hcl.Diagnostics {
 		return nil
 	}
 
-	diags = t.run(log)
+	diags = t.run(ctx, log)
 	if diags.HasErrors() {
 		return diags
 	}

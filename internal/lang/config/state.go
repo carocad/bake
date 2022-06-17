@@ -11,8 +11,7 @@ import (
 )
 
 type State struct {
-	CWD string
-	// Context     context.Context TODO
+	CWD         string
 	args        []string
 	Flags       StateFlags
 	Parallelism uint8
@@ -81,7 +80,7 @@ func EnvSlice(input map[string]string) []string {
 	return env
 }
 
-func (state State) Context() *hcl.EvalContext {
+func (state State) EvalContext() *hcl.EvalContext {
 	args := make([]cty.Value, len(state.args))
 	for index, arg := range state.args {
 		args[index] = cty.StringVal(arg)
@@ -99,8 +98,9 @@ func (state State) Context() *hcl.EvalContext {
 		}),
 	}
 
-	return &hcl.EvalContext{
+	ctx := hcl.EvalContext{
 		Variables: variables,
 		Functions: schema.Functions(),
 	}
+	return ctx.NewChild()
 }

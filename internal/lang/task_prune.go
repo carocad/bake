@@ -10,7 +10,7 @@ import (
 	"github.com/hashicorp/hcl/v2"
 )
 
-func (t Task) dryPrune(state config.State) (shouldApply bool, reason string, diags hcl.Diagnostics) {
+func (t Task) dryPrune(state *config.State) (shouldApply bool, reason string, diags hcl.Diagnostics) {
 	if state.Flags.Force {
 		return true, "force prunning is in effect", nil
 	}
