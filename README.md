@@ -17,8 +17,8 @@ Declarative tasks orchestration
   - ✅ provides an overview of the tasks it would run
   - provides a diff of target changes
 - ✅ run a (public) task:
-  - ⌛ pass process env to task
-  - ⌛ allow modifying the env for a task
+  - ✅ pass process env to task
+  - ✅ allow modifying the env for a task
   - ⌛ create a function to read .env files 
     - https://github.com/joho/godotenv
   - ✅ resolve all data and locals

@@ -153,8 +153,7 @@ func (t *Task) Apply(state config.State) hcl.Diagnostics {
 		return nil
 	}
 
-	hash := t.Hash()
-	if hash.Creates == oldHash.Creates {
+	if t.Creates == oldHash.Creates {
 		return nil
 	}
 

@@ -88,9 +88,7 @@ func (state State) Context() *hcl.EvalContext {
 	}
 
 	env := map[string]cty.Value{}
-	for _, entry := range os.Environ() {
-		parts := strings.SplitN(entry, "=", 2)
-		key, val := parts[0], parts[1]
+	for key, val := range Env() {
 		env[key] = cty.StringVal(val)
 	}
 
