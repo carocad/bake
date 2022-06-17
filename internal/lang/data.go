@@ -7,6 +7,7 @@ import (
 	"os/exec"
 	"strings"
 
+	"bake/internal/concurrent"
 	"bake/internal/lang/config"
 	"bake/internal/lang/schema"
 	"bake/internal/lang/values"
@@ -18,7 +19,8 @@ import (
 
 type Data struct {
 	addressBlock
-	Command  string `hcl:"command,optional"`
+	Command  string            `hcl:"command,optional"`
+	Env      map[string]string `hcl:"env,optional"`
 	StdOut   values.EventualString
 	StdErr   values.EventualString
 	ExitCode values.EventualInt64
@@ -30,6 +32,9 @@ func NewData(raw addressBlock, ctx *hcl.EvalContext) (*Data, hcl.Diagnostics) {
 	if diagnostics.HasErrors() {
 		return nil, diagnostics
 	}
+
+	// overwrite default env with custom values
+	data.Env = concurrent.Merge(config.Env(), data.Env)
 
 	return data, nil
 }
@@ -65,6 +70,7 @@ func (d *Data) Apply(state config.State) hcl.Diagnostics {
 
 	%s`, d.Command)
 	command := exec.Command(terminal, "-c", script)
+	command.Env = config.EnvSlice(d.Env)
 	// todo: should I allow configuring these?
 	var stdout, stderr bytes.Buffer
 	command.Stdout = &stdout
