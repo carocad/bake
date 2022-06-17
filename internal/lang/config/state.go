@@ -60,15 +60,16 @@ func NewState() (*State, error) {
 	}, nil
 }
 
-// AppendEnv returns a slice of strings following the convention
-// from os.Environ
-func AppendEnv(env map[string]string) []string {
-	osEnv := os.Environ()
-	for k, v := range env {
-		osEnv = append(osEnv, k+"="+v)
+func Env() map[string]string {
+	// organize out env vars
+	env := map[string]string{}
+	for _, keyVal := range os.Environ() {
+		parts := strings.SplitN(keyVal, "=", 2)
+		key, val := parts[0], parts[1]
+		env[key] = val
 	}
 
-	return osEnv
+	return env
 }
 
 func EnvSlice(input map[string]string) []string {

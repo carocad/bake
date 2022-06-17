@@ -108,7 +108,7 @@ func (t *Task) run(log *log.Logger) hcl.Diagnostics {
 	%s`, t.Command)
 	// todo: use exec.CommandContext
 	command := exec.Command(terminal, "-c", script)
-	command.Env = config.AppendEnv(t.Env)
+	command.Env = config.EnvSlice(t.Env)
 	// todo: should this be configurable?
 	var stdout, stderr bytes.Buffer
 	command.Stdout = &stdout

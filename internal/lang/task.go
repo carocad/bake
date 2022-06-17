@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"strconv"
 
+	"bake/internal/concurrent"
 	"bake/internal/lang/config"
 	"bake/internal/lang/meta"
 	"bake/internal/lang/schema"
@@ -64,6 +65,9 @@ func NewTask(raw addressBlock, ctx *hcl.EvalContext) (*Task, hcl.Diagnostics) {
 		task.Creates = filepath.Clean(task.Creates)
 	}
 
+	// overwrite default env with custom values
+	task.Env = concurrent.Merge(config.Env(), task.Env)
+
 	return task, nil
 }
 
@@ -85,17 +89,9 @@ func (t Task) CTY() cty.Value {
 }
 
 func (t Task) Hash() *config.Hash {
-	hasher := crc64.New(crc64.MakeTable(crc64.ISO))
-	// somehow using a map[string]string returns non-deterministic results
-	for _, v := range config.AppendEnv(t.Env) {
-		hasher.Write([]byte(v))
-	}
-	env := hasher.Sum64()
-
-	hasher.Reset()
-
-	hasher.Write([]byte(t.Command))
-	command := hasher.Sum64()
+	// somehow iterating over the map creates undeterministic results
+	env := crc64.Checksum([]byte(fmt.Sprintf("%#v", t.Env)), crc64.MakeTable(crc64.ISO))
+	command := crc64.Checksum([]byte(fmt.Sprintf("%#v", []byte(t.Command))), crc64.MakeTable(crc64.ISO))
 
 	return &config.Hash{
 		Creates: t.Creates,
