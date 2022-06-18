@@ -1,6 +1,8 @@
 package schema
 
 import (
+	"github.com/zclconf/go-cty/cty"
+	"github.com/zclconf/go-cty/cty/convert"
 	"github.com/zclconf/go-cty/cty/function"
 	"github.com/zclconf/go-cty/cty/function/stdlib"
 )
@@ -57,6 +59,7 @@ func Functions() map[string]function.Function {
 		"substr":          stdlib.SubstrFunc,
 		"timeadd":         stdlib.TimeAddFunc,
 		"title":           stdlib.TitleFunc,
+		"toset":           toset,
 		"trim":            stdlib.TrimFunc,
 		"trimprefix":      stdlib.TrimPrefixFunc,
 		"trimspace":       stdlib.TrimSpaceFunc,
@@ -66,3 +69,19 @@ func Functions() map[string]function.Function {
 		"zipmap":          stdlib.ZipmapFunc,
 	}
 }
+
+var toset = function.New(&function.Spec{
+	Params: []function.Parameter{{
+		Name:             "collection",
+		Type:             cty.DynamicPseudoType,
+		AllowNull:        true,
+		AllowMarked:      true,
+		AllowDynamicType: true,
+	}},
+	Type: func(args []cty.Value) (cty.Type, error) {
+		return cty.Set(cty.DynamicPseudoType), nil
+	},
+	Impl: func(args []cty.Value, retType cty.Type) (cty.Value, error) {
+		return convert.Convert(args[0], retType)
+	},
+})

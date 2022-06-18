@@ -1,11 +1,19 @@
 locals {
   reports_dir = "cmd"
   main = split(" ", data.main.std_out)[0]
-  binary = replace(local.main, ".go", ".bin")
   go_sources = "**/**/*.go"
   vet_report = "${local.reports_dir}/vet.txt"
   test_report = "${local.reports_dir}/test.txt"
   version_filename = "internal/info/version.go"
+  go_archs = [
+    "amd64",
+    "arm",
+    "arm64"
+  ]
+  binaries = {
+    for arch in local.go_archs:
+      arch => replace(local.main, ".go", ".${arch}.bin")
+  }
 }
 
 task "main" {
@@ -15,8 +23,10 @@ task "main" {
 }
 
 task "compile" {
-  creates = local.binary
-  command  = "go build -o ${local.binary} ${local.main}"
+  for_each = local.binaries
+
+  creates = each.value
+  command  = "GOARCH=${each.key} go build -o ${each.value} ${local.main}"
   sources  = [local.go_sources]
 
   depends_on = [version, libraries]

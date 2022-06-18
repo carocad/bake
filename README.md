@@ -30,5 +30,6 @@ Declarative tasks orchestration
 - cache targets of a recipe
   - store all target results in a zip file
   - store all targets hashes in a state file
+- ⌛ allow for_each field in data and task
 - ❓ how to handle "system" dependencies?
   - for example: how should bake react if "go" is updated between executions?

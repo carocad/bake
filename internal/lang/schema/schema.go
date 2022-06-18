@@ -18,6 +18,8 @@ const (
 	LocalScope = "local"
 	// PathScope is automatically injected
 	PathScope = "path"
+	// EachScope is automatically injected on resources with for_each meta argument
+	EachScope = "each"
 )
 
 // attributes
@@ -27,7 +29,7 @@ const (
 	CreatesAttr     = "creates"
 	SourcesAttr     = "sources"
 	DescriptionAttr = "description"
-	ForEachAttr     = "for_each" // todo
+	ForEachAttr     = "for_each"
 )
 
 var (
@@ -35,11 +37,12 @@ var (
 	DataPrefix  = cty.GetAttrPath(DataLabel)
 	LocalPrefix = cty.GetAttrPath(LocalScope)
 	PathPrefix  = cty.GetAttrPath(PathScope)
+	EachPrefix  = cty.GetAttrPath(EachScope)
 	// KnownPrefixes are the prefixes assigned to anything that is NOT a task
-	KnownPrefixes = cty.NewPathSet(DataPrefix, LocalPrefix, PathPrefix)
-	// GlobalPrefixes are those automatically injected by bake instead of defined by
+	KnownPrefixes = cty.NewPathSet(DataPrefix, LocalPrefix, PathPrefix, EachPrefix)
+	// IgnorePrefixes are those automatically injected by bake instead of defined by
 	// user input
-	GlobalPrefixes = cty.NewPathSet(PathPrefix)
+	IgnorePrefixes = cty.NewPathSet(PathPrefix, EachPrefix)
 )
 
 func IsKnownPrefix(path cty.Path) bool {

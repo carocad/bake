@@ -137,7 +137,7 @@ func getByPrefix[T lang.Address](traversal hcl.Traversal, addresses map[string]T
 
 func ignoreRef(traversal hcl.Traversal) bool {
 	traversalPath := schema.ToPath(traversal)
-	for _, path := range schema.GlobalPrefixes.List() {
+	for _, path := range schema.IgnorePrefixes.List() {
 		if traversalPath.HasPrefix(path) {
 			return true
 		}

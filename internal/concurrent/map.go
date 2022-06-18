@@ -63,3 +63,12 @@ func Merge[K comparable, V any](m1 map[K]V, m2 map[K]V) map[K]V {
 
 	return m1
 }
+
+func SetToMap[T comparable](set []T) map[T]T {
+	result := map[T]T{}
+	for _, v := range set {
+		result[v] = v
+	}
+
+	return result
+}

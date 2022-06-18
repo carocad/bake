@@ -17,6 +17,8 @@ import (
 	"github.com/hashicorp/hcl/v2"
 	"github.com/hashicorp/hcl/v2/gohcl"
 	"github.com/zclconf/go-cty/cty"
+	"github.com/zclconf/go-cty/cty/convert"
+	"github.com/zclconf/go-cty/cty/gocty"
 )
 
 type Task struct {
@@ -43,20 +45,114 @@ type TaskMetadata struct {
 	DependsOn hcl.Range
 }
 
-func NewTask(raw addressBlock, ctx *hcl.EvalContext) (*Task, hcl.Diagnostics) {
-	t := TaskMetadata{Block: raw.Block.DefRange}
-	diags := meta.DecodeRange(raw.Block.Body, ctx, &t)
+func NewTasks(raw addressBlock, ctx *hcl.EvalContext) ([]Action, hcl.Diagnostics) {
+	forEachEntries, diags := getForEachEntries(raw, ctx)
 	if diags.HasErrors() {
 		return nil, diags
 	}
 
-	task := &Task{Name: raw.GetName(), metadata: t}
+	if forEachEntries == nil {
+		task, diags := NewTask(raw, ctx)
+		if diags.HasErrors() {
+			return nil, diags
+		}
+
+		return []Action{task}, nil
+	}
+
+	tasks := make([]Action, 0)
+	for key, value := range forEachEntries {
+		ctx := eachContext(key, value, ctx.NewChild())
+		task, diags := NewTask(raw, ctx)
+		if diags.HasErrors() {
+			return nil, diags
+		}
+
+		tasks = append(tasks, task)
+	}
+
+	return tasks, nil
+}
+
+func getForEachEntries(raw addressBlock, ctx *hcl.EvalContext) (map[string]string, hcl.Diagnostics) {
+	attributes, diags := raw.Block.Body.JustAttributes()
+	if diags.HasErrors() {
+		return nil, diags
+	}
+
+	for name, attr := range attributes {
+		if name == schema.ForEachAttr {
+			value, diags := attr.Expr.Value(ctx)
+			if diags.HasErrors() {
+				return nil, diags
+			}
+
+			forEachSet := make([]string, 0)
+			err := gocty.FromCtyValue(value, &forEachSet)
+			if err == nil {
+				return concurrent.SetToMap(forEachSet), nil
+			}
+
+			diagnostic := hcl.Diagnostics{{
+				Severity: hcl.DiagError,
+				Summary: fmt.Sprintf(
+					`"for_each" field must be either a set or a map of strings but "%s" was provided`,
+					value.Type().FriendlyNameForConstraint(),
+				),
+				Detail:      err.Error(),
+				Subject:     attr.Expr.Range().Ptr(),
+				Context:     &raw.Block.DefRange,
+				Expression:  attr.Expr,
+				EvalContext: ctx,
+			}}
+			forEachMap := make(map[string]string)
+			// somehow FromCtyValue doesnt do this convertion itself :/
+			if value.Type().IsObjectType() {
+				v2, err := convert.Convert(value, cty.Map(cty.String))
+				if err != nil {
+					return nil, diagnostic
+				}
+
+				value = v2
+			}
+
+			err = gocty.FromCtyValue(value, &forEachMap)
+			if err != nil {
+				return nil, diagnostic
+			}
+
+			return forEachMap, nil
+		}
+	}
+
+	return nil, nil
+}
+
+func eachContext(key, value string, context *hcl.EvalContext) *hcl.EvalContext {
+	context.Variables = map[string]cty.Value{
+		"each": cty.ObjectVal(map[string]cty.Value{
+			"key":   cty.StringVal(key),
+			"value": cty.StringVal(value),
+		}),
+	}
+
+	return context
+}
+
+func NewTask(raw addressBlock, ctx *hcl.EvalContext) (*Task, hcl.Diagnostics) {
+	metadata := TaskMetadata{Block: raw.Block.DefRange}
+	diags := meta.DecodeRange(raw.Block.Body, ctx, &metadata)
+	if diags.HasErrors() {
+		return nil, diags
+	}
+
+	task := &Task{Name: raw.GetName(), metadata: metadata}
 	diags = gohcl.DecodeBody(raw.Block.Body, ctx, task)
 	if diags.HasErrors() {
 		return nil, diags
 	}
 
-	diags = checkDependsOn(task.Remain)
+	diags = verifyAttributes(task.Remain)
 	if diags.HasErrors() {
 		return nil, diags
 	}
@@ -68,7 +164,6 @@ func NewTask(raw addressBlock, ctx *hcl.EvalContext) (*Task, hcl.Diagnostics) {
 
 	// overwrite default env with custom values
 	task.Env = concurrent.Merge(config.Env(), task.Env)
-
 	return task, nil
 }
 
@@ -172,7 +267,7 @@ func (t *Task) Apply(ctx context.Context, state *config.State) hcl.Diagnostics {
 	return nil
 }
 
-func checkDependsOn(body hcl.Body) hcl.Diagnostics {
+func verifyAttributes(body hcl.Body) hcl.Diagnostics {
 	attrs, diags := body.JustAttributes()
 	if diags.HasErrors() {
 		return diags
@@ -182,6 +277,10 @@ func checkDependsOn(body hcl.Body) hcl.Diagnostics {
 		if attr.Name == schema.DependsOnAttr {
 			_, diags := schema.TupleOfReferences(attrs[schema.DependsOnAttr])
 			return diags
+		}
+
+		if attr.Name == schema.ForEachAttr {
+			continue
 		}
 
 		// only depends on is allowed
