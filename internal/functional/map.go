@@ -13,7 +13,7 @@ func Map[T any, U any](slice []T, f func(T) U) []U {
 }
 
 func Values[T any, U comparable](m map[U]T) []T {
-	result := make([]T, len(m))
+	result := make([]T, 0)
 	for _, t := range m {
 		result = append(result, t)
 	}
