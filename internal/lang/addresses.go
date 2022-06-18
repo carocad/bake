@@ -2,6 +2,7 @@ package lang
 
 import (
 	"bake/internal/lang/schema"
+	"fmt"
 
 	"github.com/hashicorp/hcl/v2"
 	"github.com/zclconf/go-cty/cty"
@@ -39,7 +40,13 @@ func NewPartialAddress(block *hcl.Block) ([]RawAddress, hcl.Diagnostics) {
 
 		return addrs, nil
 	default:
-		return nil, nil
+		return nil, hcl.Diagnostics{{
+			Severity: hcl.DiagError,
+			Summary:  fmt.Sprintf(`Unknown block type "%s"`, block.Type),
+			Detail:   "This is likely an internal bake error; unrelated to your recipes. Please file a bug report",
+			Subject:  &block.TypeRange,
+			Context:  &block.DefRange,
+		}}
 	}
 }
 
@@ -97,23 +104,23 @@ func (n addressBlock) Dependencies() ([]hcl.Traversal, hcl.Diagnostics) {
 	return deps, nil
 }
 
-func (n addressBlock) Decode(ctx *hcl.EvalContext) ([]Action, hcl.Diagnostics) {
-	switch n.Block.Type {
+func (addr addressBlock) Decode(ctx *hcl.EvalContext) ([]Action, hcl.Diagnostics) {
+	switch addr.Block.Type {
 	case schema.TaskLabel:
-		task, diagnostics := NewTask(n, ctx)
+		tasks, diagnostics := NewTasks(addr, ctx)
 		if diagnostics.HasErrors() {
 			return nil, diagnostics
 		}
 
-		return []Action{task}, nil
+		return tasks, nil
 	case schema.DataLabel:
-		data, diagnostics := NewData(n, ctx)
+		data, diagnostics := NewData(addr, ctx)
 		if diagnostics.HasErrors() {
 			return nil, diagnostics
 		}
 
 		return []Action{data}, nil
 	default:
-		panic("missing label implementation " + n.Block.Type)
+		panic("missing label implementation " + addr.Block.Type)
 	}
 }
