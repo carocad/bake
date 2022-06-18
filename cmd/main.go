@@ -46,13 +46,13 @@ func do(ctx context.Context) (hcl.DiagnosticWriter, error) {
 	// keep track of flags and other config related vars
 	state, err := config.NewState()
 	if err != nil {
-		return nil, err
+		return log, err
 	}
 
 	// read bake files in the cwd
 	addrs, diags := internal.ReadRecipes(state.CWD, parser)
 	if diags.HasErrors() {
-		return nil, diags
+		return log, diags
 	}
 
 	tasks := lang.GetPublicTasks(addrs)
