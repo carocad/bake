@@ -107,14 +107,14 @@ func (n addressBlock) Dependencies() ([]hcl.Traversal, hcl.Diagnostics) {
 func (addr addressBlock) Decode(ctx *hcl.EvalContext) ([]Action, hcl.Diagnostics) {
 	switch addr.Block.Type {
 	case schema.TaskLabel:
-		tasks, diagnostics := NewTasks(addr, ctx)
+		tasks, diagnostics := newTasks(addr, ctx)
 		if diagnostics.HasErrors() {
 			return nil, diagnostics
 		}
 
 		return tasks, nil
 	case schema.DataLabel:
-		data, diagnostics := NewData(addr, ctx)
+		data, diagnostics := newData(addr, ctx)
 		if diagnostics.HasErrors() {
 			return nil, diagnostics
 		}

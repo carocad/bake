@@ -19,7 +19,7 @@ import (
 	"github.com/zclconf/go-cty/cty"
 )
 
-type Data struct {
+type data struct {
 	addressBlock
 	Command  string            `hcl:"command,optional"`
 	Env      map[string]string `hcl:"env,optional"`
@@ -28,8 +28,8 @@ type Data struct {
 	ExitCode values.EventualInt64
 }
 
-func NewData(raw addressBlock, ctx *hcl.EvalContext) (*Data, hcl.Diagnostics) {
-	data := &Data{addressBlock: raw}
+func newData(raw addressBlock, ctx *hcl.EvalContext) (*data, hcl.Diagnostics) {
+	data := &data{addressBlock: raw}
 	diagnostics := gohcl.DecodeBody(raw.Block.Body, ctx, data)
 	if diagnostics.HasErrors() {
 		return nil, diagnostics
@@ -41,18 +41,18 @@ func NewData(raw addressBlock, ctx *hcl.EvalContext) (*Data, hcl.Diagnostics) {
 	return data, nil
 }
 
-func (d Data) CTY() cty.Value {
+func (d data) CTY() cty.Value {
 	value := values.StructToCty(d)
 	m := value.AsValueMap()
 	m[schema.NameLabel] = cty.StringVal(d.GetName())
 	return cty.ObjectVal(m)
 }
 
-func (d Data) Hash() *config.Hash {
+func (d data) Hash() *config.Hash {
 	return nil
 }
 
-func (d *Data) Apply(ctx context.Context, state *config.State) hcl.Diagnostics {
+func (d *data) Apply(ctx context.Context, state *config.State) hcl.Diagnostics {
 	if d.ExitCode.Valid { // apply data even on dry run
 		return nil
 	}

@@ -30,11 +30,11 @@ type Task struct {
 	Env         map[string]string `hcl:"env,optional"`
 	Remain      hcl.Body          `hcl:",remain"`
 	ExitCode    values.EventualInt64
-	metadata    TaskMetadata
+	metadata    taskMetadata
 	key         string // key is only valid for tasks with for_each attribute
 }
 
-type TaskMetadata struct {
+type taskMetadata struct {
 	// manual metadata
 	Block hcl.Range
 	// metadata from block
@@ -46,14 +46,14 @@ type TaskMetadata struct {
 	DependsOn hcl.Range
 }
 
-func NewTasks(raw addressBlock, ctx *hcl.EvalContext) ([]Action, hcl.Diagnostics) {
+func newTasks(raw addressBlock, ctx *hcl.EvalContext) ([]Action, hcl.Diagnostics) {
 	forEachEntries, diags := getForEachEntries(raw, ctx)
 	if diags.HasErrors() {
 		return nil, diags
 	}
 
 	if forEachEntries == nil {
-		task, diags := NewTask("", raw, ctx)
+		task, diags := newTask("", raw, ctx)
 		if diags.HasErrors() {
 			return nil, diags
 		}
@@ -64,7 +64,7 @@ func NewTasks(raw addressBlock, ctx *hcl.EvalContext) ([]Action, hcl.Diagnostics
 	tasks := make([]Action, 0)
 	for key, value := range forEachEntries {
 		ctx := eachContext(key, value, ctx.NewChild())
-		task, diags := NewTask(key, raw, ctx)
+		task, diags := newTask(key, raw, ctx)
 		if diags.HasErrors() {
 			return nil, diags
 		}
@@ -140,8 +140,8 @@ func eachContext(key, value string, context *hcl.EvalContext) *hcl.EvalContext {
 	return context
 }
 
-func NewTask(key string, raw addressBlock, ctx *hcl.EvalContext) (*Task, hcl.Diagnostics) {
-	metadata := TaskMetadata{Block: raw.Block.DefRange}
+func newTask(key string, raw addressBlock, ctx *hcl.EvalContext) (*Task, hcl.Diagnostics) {
+	metadata := taskMetadata{Block: raw.Block.DefRange}
 	diags := meta.DecodeRange(raw.Block.Body, ctx, &metadata)
 	if diags.HasErrors() {
 		return nil, diags
