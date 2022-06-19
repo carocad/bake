@@ -96,14 +96,14 @@ func (coordinator *Coordinator) Do(state *config.State, task lang.RawAddress, ad
 		return nil, diags
 	}
 
-	taskDependencies, _ := allDependencies.Get(task)
+	taskDependencies := allDependencies[lang.AddressToString(task)]
 	for _, address := range taskDependencies {
 		// initialize this dependency wait group so that other goroutines can wait for it
 		promise := &sync.WaitGroup{}
 		coordinator.waiting.Put(address, promise)
 
 		// get the dependencies of this task dependency
-		addressDependencies, _ := allDependencies.Get(address)
+		addressDependencies := allDependencies[lang.AddressToString(address)]
 		// wait for all routines to finish so that we get all actions
 		// we need to remove the last element since it is the address itself
 		diags := coordinator.waitFor(addressDependencies[:len(addressDependencies)-1])

@@ -3,7 +3,6 @@ package topo
 import (
 	"fmt"
 
-	"bake/internal/concurrent"
 	"bake/internal/functional"
 	"bake/internal/lang"
 	"bake/internal/lang/schema"
@@ -21,20 +20,20 @@ const (
 )
 
 // AllDependencies returns a map of address string to addresses
-func AllDependencies[T lang.RawAddress](task T, addresses []T) (*concurrent.Map[T, []T], hcl.Diagnostics) {
+func AllDependencies(task lang.RawAddress, addresses []lang.RawAddress) (map[string][]lang.RawAddress, hcl.Diagnostics) {
 	deps, diags := Dependencies(task, addresses)
 	if diags.HasErrors() {
 		return nil, diags
 	}
 
-	result := concurrent.NewMapBy[T, []T](lang.AddressToString[T])
+	result := map[string][]lang.RawAddress{}
 	for _, dep := range deps {
 		inner, diags := Dependencies(dep, addresses)
 		if diags.HasErrors() {
 			return nil, diags
 		}
 
-		result.Put(dep, inner)
+		result[lang.AddressToString(dep)] = inner
 	}
 
 	return result, nil
@@ -43,8 +42,8 @@ func AllDependencies[T lang.RawAddress](task T, addresses []T) (*concurrent.Map[
 // Dependencies sorting according to
 // https://www.wikiwand.com/en/Topological_sorting#/Depth-first_search
 // NOTE: the task itself is the last element of the dependency list
-func Dependencies[T lang.RawAddress](addr T, addresses []T) ([]T, hcl.Diagnostics) {
-	mapping := map[string]T{}
+func Dependencies(addr lang.RawAddress, addresses []lang.RawAddress) ([]lang.RawAddress, hcl.Diagnostics) {
+	mapping := map[string]lang.RawAddress{}
 	for _, address := range addresses {
 		mapping[lang.AddressToString(address)] = address
 	}
@@ -64,7 +63,7 @@ func Dependencies[T lang.RawAddress](addr T, addresses []T) ([]T, hcl.Diagnostic
 
 const cyclicalDependency = "cyclical dependency detected"
 
-func visit[T lang.RawAddress](current string, markers map[string]marker, addresses map[string]T) ([]T, hcl.Diagnostics) {
+func visit(current string, markers map[string]marker, addresses map[string]lang.RawAddress) ([]lang.RawAddress, hcl.Diagnostics) {
 	mark := markers[current]
 	if mark == permanent {
 		return nil, nil
@@ -79,7 +78,7 @@ func visit[T lang.RawAddress](current string, markers map[string]marker, address
 	}
 
 	markers[current] = temporary
-	order := make([]T, 0)
+	order := make([]lang.RawAddress, 0)
 	dependencies, diagnostics := addresses[current].Dependencies()
 	if diagnostics.HasErrors() {
 		return nil, diagnostics
