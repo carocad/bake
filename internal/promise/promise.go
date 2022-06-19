@@ -1,4 +1,4 @@
-package concurrent
+package promise
 
 import (
 	"sync"
