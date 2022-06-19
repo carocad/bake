@@ -7,6 +7,7 @@ import (
 	"bake/internal/functional"
 	"bake/internal/lang"
 	"bake/internal/lang/schema"
+	"bake/internal/paths"
 
 	"github.com/hashicorp/hcl/v2"
 )
@@ -114,7 +115,7 @@ func visit[T lang.RawAddress](current string, markers map[string]marker, address
 }
 
 func getByPrefix[T lang.Address](traversal hcl.Traversal, addresses map[string]T) (*T, hcl.Diagnostics) {
-	path := schema.ToPath(traversal)
+	path := paths.FromTraversal(traversal)
 	for _, address := range addresses {
 		if path.HasPrefix(address.GetPath()) {
 			return &address, nil
@@ -122,7 +123,7 @@ func getByPrefix[T lang.Address](traversal hcl.Traversal, addresses map[string]T
 	}
 
 	options := functional.Map(functional.Values(addresses), lang.AddressToString[T])
-	suggestion := functional.Suggest(schema.PathString(path), options)
+	suggestion := functional.Suggest(paths.String(path), options)
 	summary := "unknown reference"
 	if suggestion != "" {
 		summary += fmt.Sprintf(`. Did you mean "%s"?`, suggestion)
@@ -136,7 +137,7 @@ func getByPrefix[T lang.Address](traversal hcl.Traversal, addresses map[string]T
 }
 
 func ignoreRef(traversal hcl.Traversal) bool {
-	traversalPath := schema.ToPath(traversal)
+	traversalPath := paths.FromTraversal(traversal)
 	for _, path := range schema.IgnorePrefixes.List() {
 		if traversalPath.HasPrefix(path) {
 			return true

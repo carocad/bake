@@ -4,6 +4,7 @@ import (
 	"bake/internal/lang/config"
 	"bake/internal/lang/schema"
 	"bake/internal/lang/values"
+	"bake/internal/paths"
 	"context"
 	"log"
 	"os"
@@ -34,7 +35,7 @@ type RawAddress interface {
 }
 
 func AddressToString[T Address](addr T) string {
-	return schema.PathString(addr.GetPath())
+	return paths.String(addr.GetPath())
 }
 
 type CliCommand struct{ Name, Description string }
@@ -68,7 +69,7 @@ func GetPublicTasks(addrs []RawAddress) []CliCommand {
 			continue
 		}
 
-		commands = append(commands, CliCommand{addr.GetName(), description})
+		commands = append(commands, CliCommand{paths.String(addr.GetPath()), description})
 	}
 
 	return commands

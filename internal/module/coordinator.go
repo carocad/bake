@@ -6,6 +6,7 @@ import (
 	"bake/internal/lang/config"
 	"bake/internal/lang/schema"
 	"bake/internal/module/topo"
+	"bake/internal/paths"
 	"context"
 	"fmt"
 	"path/filepath"
@@ -13,6 +14,7 @@ import (
 
 	"github.com/hashicorp/hcl/v2"
 	"github.com/zclconf/go-cty/cty"
+	"github.com/zclconf/go-cty/cty/function/stdlib"
 	"golang.org/x/sync/errgroup"
 )
 
@@ -186,15 +188,26 @@ func actionsContext(actions []lang.Action) map[string]cty.Value {
 	local := map[string]cty.Value{}
 	task := map[string]cty.Value{}
 	for _, act := range actions {
-		name := act.GetName()
 		path := act.GetPath()
 		value := act.CTY()
+		var err error
 		switch {
 		case path.HasPrefix(schema.DataPrefix):
+			name := paths.StepString(path[1])
 			data[name] = value
 		case path.HasPrefix(schema.LocalPrefix):
+			name := paths.StepString(path[1])
 			local[name] = value
 		default:
+			name := paths.StepString(path[0])
+			val, ok := task[name] // if the key already exist it is a map
+			if ok {
+				value, err = stdlib.Merge(value, val)
+				if err != nil {
+					panic(err.Error())
+				}
+			}
+
 			task[name] = value
 		}
 	}

@@ -31,6 +31,7 @@ type Task struct {
 	Remain      hcl.Body          `hcl:",remain"`
 	ExitCode    values.EventualInt64
 	metadata    TaskMetadata
+	key         string // key is only valid for tasks with for_each attribute
 }
 
 type TaskMetadata struct {
@@ -52,7 +53,7 @@ func NewTasks(raw addressBlock, ctx *hcl.EvalContext) ([]Action, hcl.Diagnostics
 	}
 
 	if forEachEntries == nil {
-		task, diags := NewTask(raw, ctx)
+		task, diags := NewTask("", raw, ctx)
 		if diags.HasErrors() {
 			return nil, diags
 		}
@@ -63,7 +64,7 @@ func NewTasks(raw addressBlock, ctx *hcl.EvalContext) ([]Action, hcl.Diagnostics
 	tasks := make([]Action, 0)
 	for key, value := range forEachEntries {
 		ctx := eachContext(key, value, ctx.NewChild())
-		task, diags := NewTask(raw, ctx)
+		task, diags := NewTask(key, raw, ctx)
 		if diags.HasErrors() {
 			return nil, diags
 		}
@@ -139,14 +140,14 @@ func eachContext(key, value string, context *hcl.EvalContext) *hcl.EvalContext {
 	return context
 }
 
-func NewTask(raw addressBlock, ctx *hcl.EvalContext) (*Task, hcl.Diagnostics) {
+func NewTask(key string, raw addressBlock, ctx *hcl.EvalContext) (*Task, hcl.Diagnostics) {
 	metadata := TaskMetadata{Block: raw.Block.DefRange}
 	diags := meta.DecodeRange(raw.Block.Body, ctx, &metadata)
 	if diags.HasErrors() {
 		return nil, diags
 	}
 
-	task := &Task{Name: raw.GetName(), metadata: metadata}
+	task := &Task{Name: raw.GetName(), metadata: metadata, key: key}
 	diags = gohcl.DecodeBody(raw.Block.Body, ctx, task)
 	if diags.HasErrors() {
 		return nil, diags
@@ -172,8 +173,12 @@ func (t Task) GetName() string {
 }
 
 func (t Task) GetPath() cty.Path {
-	// todo: change this to deal with for_each cases
-	return cty.GetAttrPath(t.GetName())
+	path := cty.GetAttrPath(t.GetName())
+	if t.key == "" {
+		return path
+	}
+
+	return path.IndexString(t.key)
 }
 
 func (t Task) GetFilename() string {
@@ -181,7 +186,13 @@ func (t Task) GetFilename() string {
 }
 
 func (t Task) CTY() cty.Value {
-	return values.StructToCty(t)
+	if t.key == "" {
+		return values.StructToCty(t)
+	}
+
+	return cty.MapVal(map[string]cty.Value{
+		t.key: values.StructToCty(t),
+	})
 }
 
 func (t Task) Hash() *config.Hash {

@@ -2,7 +2,7 @@ package config
 
 import (
 	"bake/internal/info"
-	"bake/internal/lang/schema"
+	"bake/internal/paths"
 	"encoding/json"
 	"os"
 	"path/filepath"
@@ -63,7 +63,7 @@ func (lock *Lock) Update(hashes []*Hash) {
 			continue
 		}
 
-		lock.Tasks[schema.PathString(hash.Path)] = *hash
+		lock.Tasks[paths.String(hash.Path)] = *hash
 	}
 }
 

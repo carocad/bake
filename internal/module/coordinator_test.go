@@ -85,11 +85,11 @@ func TestSerialCoordination(t *testing.T) {
 
 	end := time.Now()
 	last := len(actions) - 1
-	if actions[last].GetName() != preData[last] {
+	if lang.AddressToString(actions[last]) != preData[last] {
 		t.Errorf("expected an slice of %v but got %v", data[:last], actions[last])
 	}
 
-	if actions[0].GetName() != preData[0] {
+	if lang.AddressToString(actions[0]) != preData[0] {
 		t.Errorf("expected an slice of %v but got %v", nil, actions[0])
 	}
 
@@ -154,12 +154,12 @@ func TestCustomCoordination(t *testing.T) {
 
 	end := time.Now()
 	last := len(actions) - 1
-	if actions[last].GetName() != data[4].name {
-		t.Errorf("expected last action %s but got %s", data[4].GetName(), actions[last].GetName())
+	if lang.AddressToString(actions[last]) != data[4].name {
+		t.Errorf("expected last action %s but got %s", data[4].GetName(), lang.AddressToString(actions[last]))
 	}
 
-	if actions[0].GetName() != data[0].name && actions[0].GetName() != data[2].name {
-		t.Errorf("expected first action %s but got %s", data[0].name, actions[0].GetName())
+	if lang.AddressToString(actions[0]) != data[0].name && lang.AddressToString(actions[0]) != data[2].name {
+		t.Errorf("expected first action %s but got %s", data[0].name, lang.AddressToString(actions[0]))
 	}
 
 	duration := end.Sub(start)

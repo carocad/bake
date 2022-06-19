@@ -16,6 +16,5 @@
 /.idea/
 *.bin
 cmd/*.txt
-version.go
 .vscode
 .bake
