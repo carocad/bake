@@ -4,8 +4,8 @@ package info
 import "time"
 
 const (
-  Version  = ""
-  Revision = "8ac7d38"
+  Version  = "v0.1.0"
+  Revision = "5e9e632"
   Branch = "main"
 )
 
