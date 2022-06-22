@@ -120,7 +120,7 @@ func (t *Task) run(ctx context.Context, log *log.Logger) hcl.Diagnostics {
 	// if the process is just iddling
 	log.Println(`done in ` + end.Sub(start).String())
 	// store results
-	t.ExitCode = values.EventualInt64{
+	t.exitCode = values.EventualInt64{
 		Int64: int64(command.ProcessState.ExitCode()),
 		Valid: true,
 	}

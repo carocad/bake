@@ -29,7 +29,7 @@ type Task struct {
 	Sources     []string          `hcl:"sources,optional"`
 	Env         map[string]string `hcl:"env,optional"`
 	Remain      hcl.Body          `hcl:",remain"`
-	ExitCode    values.EventualInt64
+	exitCode    values.EventualInt64
 	metadata    taskMetadata
 	key         string // key is only valid for tasks with for_each attribute
 }
@@ -205,13 +205,13 @@ func (t Task) Hash() *config.Hash {
 		Path:    t.GetPath(),
 		Command: strconv.FormatUint(command, 16),
 		Env:     strconv.FormatUint(env, 16),
-		Dirty:   !t.ExitCode.Valid || t.ExitCode.Int64 != 0,
+		Dirty:   !t.exitCode.Valid || t.exitCode.Int64 != 0,
 	}
 }
 
 func (t *Task) Apply(ctx context.Context, state *config.State) hcl.Diagnostics {
 	// don't apply twice in case more than 1 task depends on this
-	if t.ExitCode.Valid || t.Command == "" {
+	if t.exitCode.Valid || t.Command == "" {
 		return nil
 	}
 
