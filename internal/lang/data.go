@@ -2,11 +2,11 @@ package lang
 
 import (
 	"bytes"
-	"context"
 	"fmt"
 	"os"
 	"os/exec"
 	"strings"
+	"sync"
 	"time"
 
 	"bake/internal/concurrent"
@@ -52,9 +52,9 @@ func (d data) Hash() *config.Hash {
 	return nil
 }
 
-func (d *data) Apply(ctx context.Context, state *config.State) hcl.Diagnostics {
+func (d *data) Apply(state *config.State) (*sync.WaitGroup, hcl.Diagnostics) {
 	if d.ExitCode.Valid { // apply data even on dry run
-		return nil
+		return nil, nil
 	}
 
 	log := NewLogger(d)
@@ -71,7 +71,7 @@ func (d *data) Apply(ctx context.Context, state *config.State) hcl.Diagnostics {
 	set -euo pipefail
 
 	%s`, d.Command)
-	command := exec.CommandContext(ctx, terminal, "-c", script)
+	command := exec.CommandContext(state.Context, terminal, "-c", script)
 	command.Env = config.EnvSlice(d.Env)
 	// todo: should I allow configuring these?
 	var stdout, stderr bytes.Buffer
@@ -102,7 +102,7 @@ func (d *data) Apply(ctx context.Context, state *config.State) hcl.Diagnostics {
 	}
 
 	if err != nil {
-		return hcl.Diagnostics{{
+		return nil, hcl.Diagnostics{{
 			Severity: hcl.DiagError,
 			Summary:  fmt.Sprintf(`"%s" command failed with: %s`, AddressToString(d), command.ProcessState.String()),
 			Detail:   detail,
@@ -112,5 +112,5 @@ func (d *data) Apply(ctx context.Context, state *config.State) hcl.Diagnostics {
 	}
 
 	log.Println(`done in ` + end.Sub(start).String())
-	return nil
+	return nil, nil
 }

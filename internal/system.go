@@ -1,7 +1,6 @@
 package internal
 
 import (
-	"context"
 	"fmt"
 	"io/ioutil"
 	"path/filepath"
@@ -55,13 +54,13 @@ func ReadRecipes(cwd string, parser *hclparse.Parser) ([]lang.RawAddress, hcl.Di
 	return addresses, nil
 }
 
-func Do(ctx context.Context, taskName string, state *config.State, addrs []lang.RawAddress) hcl.Diagnostics {
+func Do(taskName string, state *config.State, addrs []lang.RawAddress) hcl.Diagnostics {
 	task, diags := getTask(taskName, addrs)
 	if diags.HasErrors() {
 		return diags
 	}
 
-	coordinator := module.NewCoordinator(ctx, int(state.Parallelism))
+	coordinator := module.NewCoordinator()
 	actions, diags := coordinator.Do(state, task, addrs)
 	if state.Flags.Dry || state.Flags.Prune {
 		return diags

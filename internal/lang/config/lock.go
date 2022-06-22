@@ -51,19 +51,24 @@ func lockFromFilesystem(cwd string) (*Lock, error) {
 	return &lock, nil
 }
 
-func (lock *Lock) Update(hashes []*Hash) {
+type Hasher interface {
+	Hash() (cty.Path, interface{})
+}
+
+func (lock *Lock) Update(hashes []Hasher) {
 	lock.Version = info.Version
 	lock.Timestamp = time.Now()
-	for _, hash := range hashes {
+	for _, hasher := range hashes {
+		path, hash := hasher.Hash()
 		if hash == nil {
 			continue
 		}
 
-		if hash.Dirty || hash.Creates == "" {
+		if hash.Dirty || hasher.Creates == "" {
 			continue
 		}
 
-		lock.Tasks[paths.String(hash.Path)] = *hash
+		lock.Tasks[paths.String(hasher.Path)] = *hasher
 	}
 }
 
@@ -88,8 +93,6 @@ func (lock *Lock) Store(cwd string) error {
 type Hash struct {
 	// Dirty flags a Hash as comming from a Task that might have not exit correctly
 	Dirty bool `json:"-"`
-	// Path to identify the action this Hash came from
-	Path cty.Path `json:"-"`
 	// Creates keep a ref to the old filename in case it is renamed
 	Creates string
 	// Env hash just to check if it changes between executions

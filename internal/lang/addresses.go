@@ -1,8 +1,10 @@
 package lang
 
 import (
+	"bake/internal/lang/config"
 	"bake/internal/lang/schema"
 	"fmt"
+	"sync"
 
 	"github.com/hashicorp/hcl/v2"
 	"github.com/zclconf/go-cty/cty"
@@ -104,10 +106,10 @@ func (n addressBlock) Dependencies() ([]hcl.Traversal, hcl.Diagnostics) {
 	return deps, nil
 }
 
-func (addr addressBlock) Decode(ctx *hcl.EvalContext) ([]Action, hcl.Diagnostics) {
+func (addr addressBlock) Decode(ctx *hcl.EvalContext) (Action, hcl.Diagnostics) {
 	switch addr.Block.Type {
 	case schema.TaskLabel:
-		tasks, diagnostics := newTasks(addr, ctx)
+		tasks, diagnostics := newTaskContainer(addr, ctx)
 		if diagnostics.HasErrors() {
 			return nil, diagnostics
 		}
@@ -119,8 +121,53 @@ func (addr addressBlock) Decode(ctx *hcl.EvalContext) ([]Action, hcl.Diagnostics
 			return nil, diagnostics
 		}
 
-		return []Action{data}, nil
+		return data, nil
 	default:
 		panic("missing label implementation " + addr.Block.Type)
 	}
+}
+
+type runtime interface {
+	Apply(*config.State) *sync.WaitGroup
+}
+
+type instance interface {
+	Apply(*config.State) hcl.Diagnostics
+}
+
+func applyIndexed(instances []instance, state *config.State) *sync.WaitGroup {
+	wait := &sync.WaitGroup{}
+	for _, app := range instances {
+		app := app
+		wait.Add(1)
+		state.Group.Go(func() error {
+			defer wait.Done()
+
+			diags := app.Apply(state)
+			if diags.HasErrors() {
+				return diags
+			}
+
+			return nil
+		})
+	}
+
+	return wait
+}
+
+func applySingle(instance instance, state *config.State) *sync.WaitGroup {
+	wait := &sync.WaitGroup{}
+	wait.Add(1)
+	state.Group.Go(func() error {
+		defer wait.Done()
+
+		diags := instance.Apply(state)
+		if diags.HasErrors() {
+			return diags
+		}
+
+		return nil
+	})
+
+	return wait
 }

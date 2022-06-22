@@ -15,8 +15,9 @@ require (
 require (
 	github.com/apparentlymart/go-textseg/v13 v13.0.0 // indirect
 	github.com/cpuguy83/go-md2man/v2 v2.0.1 // indirect
-	github.com/google/go-cmp v0.3.1 // indirect
+	github.com/google/go-cmp v0.5.8 // indirect
 	github.com/mitchellh/go-wordwrap v0.0.0-20150314170334-ad45545899c7 // indirect
 	github.com/russross/blackfriday/v2 v2.1.0 // indirect
+	golang.org/x/exp v0.0.0-20220613132600-b0d781184e0d // indirect
 	golang.org/x/text v0.3.7 // indirect
 )

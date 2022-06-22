@@ -44,7 +44,7 @@ func do(ctx context.Context) (hcl.DiagnosticWriter, error) {
 	// logger for diagnostics
 	log := hcl.NewDiagnosticTextWriter(os.Stdout, parser.Files(), 78, true)
 	// keep track of flags and other config related vars
-	state, err := config.NewState()
+	state, err := config.NewState(ctx)
 	if err != nil {
 		return log, err
 	}
@@ -83,7 +83,7 @@ func do(ctx context.Context) (hcl.DiagnosticWriter, error) {
 				}
 
 				start := time.Now()
-				diags := internal.Do(ctx, c.Command.Name, state, addrs)
+				diags := internal.Do(c.Command.Name, state, addrs)
 				end := time.Now()
 				fmt.Printf("\ndone in %s\n", end.Sub(start).String())
 				if diags.HasErrors() {

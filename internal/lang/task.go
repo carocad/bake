@@ -7,6 +7,7 @@ import (
 	"os"
 	"path/filepath"
 	"strconv"
+	"sync"
 
 	"bake/internal/concurrent"
 	"bake/internal/lang/config"
@@ -19,49 +20,37 @@ import (
 	"github.com/zclconf/go-cty/cty"
 	"github.com/zclconf/go-cty/cty/convert"
 	"github.com/zclconf/go-cty/cty/gocty"
+	"golang.org/x/exp/maps"
 )
 
-type Task struct {
-	Name        string
-	Description string            `hcl:"description,optional"`
-	Command     string            `hcl:"command,optional"`
-	Creates     string            `hcl:"creates,optional"`
-	Sources     []string          `hcl:"sources,optional"`
-	Env         map[string]string `hcl:"env,optional"`
-	Remain      hcl.Body          `hcl:",remain"`
-	ExitCode    values.EventualInt64
-	metadata    taskMetadata
-	key         string // key is only valid for tasks with for_each attribute
+type TaskContainer struct {
+	Name string
+	// todo: how can I get this?
+	// Description string `hcl:"description,optional"`
+
+	metadata taskMetadata
+
+	namedInstances   map[string]instance
+	indexedInstances []instance
+	singleInstance   instance
 }
 
-type taskMetadata struct {
-	// manual metadata
-	Block hcl.Range
-	// metadata from block
-	// Description cannot be fetch from Block since it was already decoded
-	Command   hcl.Range
-	Creates   hcl.Range
-	Sources   hcl.Range
-	Remain    hcl.Range
-	DependsOn hcl.Range
-}
-
-func newTasks(raw addressBlock, ctx *hcl.EvalContext) ([]Action, hcl.Diagnostics) {
+func newTaskContainer(raw addressBlock, ctx *hcl.EvalContext) (Action, hcl.Diagnostics) {
 	forEachEntries, diags := getForEachEntries(raw, ctx)
 	if diags.HasErrors() {
 		return nil, diags
 	}
 
 	if forEachEntries == nil {
-		task, diags := newTask("", raw, ctx)
+		task, diags := newTask(raw, ctx)
 		if diags.HasErrors() {
 			return nil, diags
 		}
 
-		return []Action{task}, nil
+		return task, nil
 	}
 
-	tasks := make([]Action, 0)
+	instances := map[string]instance{}
 	for key, value := range forEachEntries {
 		ctx := eachContext(key, value, ctx.NewChild())
 		task, diags := newTask(key, raw, ctx)
@@ -69,10 +58,13 @@ func newTasks(raw addressBlock, ctx *hcl.EvalContext) ([]Action, hcl.Diagnostics
 			return nil, diags
 		}
 
-		tasks = append(tasks, task)
+		instances[key] = task
 	}
 
-	return tasks, nil
+	return &TaskContainer{
+		Name:           raw.GetName(),
+		namedInstances: instances,
+	}, nil
 }
 
 func getForEachEntries(raw addressBlock, ctx *hcl.EvalContext) (map[string]string, hcl.Diagnostics) {
@@ -140,6 +132,74 @@ func eachContext(key, value string, context *hcl.EvalContext) *hcl.EvalContext {
 	return context
 }
 
+func (t TaskContainer) GetName() string {
+	return t.Name
+}
+
+func (t TaskContainer) GetPath() cty.Path {
+	return cty.GetAttrPath(t.GetName())
+}
+
+func (t TaskContainer) GetFilename() string {
+	return t.metadata.Block.Filename
+}
+
+func (t TaskContainer) CTY() cty.Value {
+	if len(t.namedInstances) > 0 {
+		m := map[string]cty.Value{}
+		for k, instance := range t.namedInstances {
+			m[k] = instance.CTY()
+		}
+
+		return cty.MapVal(m)
+	}
+
+	if len(t.indexedInstances) > 0 {
+		m := make([]cty.Value, len(t.namedInstances))
+		for index, instance := range t.namedInstances {
+			m[index] = instance.CTY()
+		}
+
+		return cty.ListVal(m)
+	}
+
+	return t.singleInstance.CTY()
+}
+
+func (t *TaskContainer) Apply(state *config.State) *sync.WaitGroup {
+	if len(t.namedInstances) > 0 {
+		return applyIndexed(maps.Values(t.namedInstances), state)
+	}
+
+	if len(t.indexedInstances) > 0 {
+		return applyIndexed(t.indexedInstances, state)
+	}
+
+	return applySingle(t.singleInstance, state)
+
+}
+
+type Task struct {
+	Command  string            `hcl:"command,optional"`
+	Creates  string            `hcl:"creates,optional"`
+	Sources  []string          `hcl:"sources,optional"`
+	Env      map[string]string `hcl:"env,optional"`
+	Remain   hcl.Body          `hcl:",remain"`
+	ExitCode values.EventualInt64
+}
+
+type taskMetadata struct {
+	// manual metadata
+	Block hcl.Range
+	// metadata from block
+	// Description cannot be fetch from Block since it was already decoded
+	Command   hcl.Range
+	Creates   hcl.Range
+	Sources   hcl.Range
+	Remain    hcl.Range
+	DependsOn hcl.Range
+}
+
 func newTask(key string, raw addressBlock, ctx *hcl.EvalContext) (*Task, hcl.Diagnostics) {
 	metadata := taskMetadata{Block: raw.Block.DefRange}
 	diags := meta.DecodeRange(raw.Block.Body, ctx, &metadata)
@@ -147,7 +207,7 @@ func newTask(key string, raw addressBlock, ctx *hcl.EvalContext) (*Task, hcl.Dia
 		return nil, diags
 	}
 
-	task := &Task{Name: raw.GetName(), metadata: metadata, key: key}
+	task := &Task{metadata: metadata}
 	diags = gohcl.DecodeBody(raw.Block.Body, ctx, task)
 	if diags.HasErrors() {
 		return nil, diags
@@ -168,41 +228,13 @@ func newTask(key string, raw addressBlock, ctx *hcl.EvalContext) (*Task, hcl.Dia
 	return task, nil
 }
 
-func (t Task) GetName() string {
-	return t.Name
-}
-
-func (t Task) GetPath() cty.Path {
-	path := cty.GetAttrPath(t.GetName())
-	if t.key == "" {
-		return path
-	}
-
-	return path.IndexString(t.key)
-}
-
-func (t Task) GetFilename() string {
-	return t.metadata.Block.Filename
-}
-
-func (t Task) CTY() cty.Value {
-	if t.key == "" {
-		return values.StructToCty(t)
-	}
-
-	return cty.MapVal(map[string]cty.Value{
-		t.key: values.StructToCty(t),
-	})
-}
-
-func (t Task) Hash() *config.Hash {
+func (t Task) Hash() interface{} {
 	// somehow iterating over the map creates undeterministic results
 	env := crc64.Checksum([]byte(fmt.Sprintf("%#v", t.Env)), crc64.MakeTable(crc64.ISO))
 	command := crc64.Checksum([]byte(fmt.Sprintf("%#v", []byte(t.Command))), crc64.MakeTable(crc64.ISO))
 
 	return &config.Hash{
 		Creates: t.Creates,
-		Path:    t.GetPath(),
 		Command: strconv.FormatUint(command, 16),
 		Env:     strconv.FormatUint(env, 16),
 		Dirty:   !t.ExitCode.Valid || t.ExitCode.Int64 != 0,

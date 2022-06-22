@@ -2,7 +2,7 @@ package lang
 
 import (
 	"bake/internal/lang/config"
-	"context"
+	"sync"
 
 	"github.com/hashicorp/hcl/v2"
 	"github.com/zclconf/go-cty/cty"
@@ -30,17 +30,15 @@ func (a addressAttribute) Dependencies() ([]hcl.Traversal, hcl.Diagnostics) {
 	return a.expr.Variables(), nil
 }
 
-func (a addressAttribute) Decode(ctx *hcl.EvalContext) ([]Action, hcl.Diagnostics) {
+func (a addressAttribute) Decode(ctx *hcl.EvalContext) (Action, hcl.Diagnostics) {
 	value, diagnostics := a.expr.Value(ctx)
 	if diagnostics.HasErrors() {
 		return nil, diagnostics
 	}
 
-	return []Action{
-		Local{
-			addressAttribute: a,
-			value:            value,
-		},
+	return Local{
+		addressAttribute: a,
+		value:            value,
 	}, nil
 }
 
@@ -49,8 +47,8 @@ type Local struct {
 	value cty.Value
 }
 
-func (l Local) Apply(ctx context.Context, state *config.State) hcl.Diagnostics {
-	return nil
+func (l Local) Apply(state *config.State) (*sync.WaitGroup, hcl.Diagnostics) {
+	return nil, nil
 }
 
 func (l Local) CTY() cty.Value {

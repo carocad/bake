@@ -2,11 +2,9 @@ package lang
 
 import (
 	"bake/internal/concurrent"
-	"bake/internal/lang/config"
 	"bake/internal/lang/schema"
 	"bake/internal/lang/values"
 	"bake/internal/paths"
-	"context"
 	"log"
 	"os"
 
@@ -26,14 +24,13 @@ type Address interface {
 type Action interface {
 	Address
 	values.Cty
-	Apply(context.Context, *config.State) hcl.Diagnostics
-	Hash() *config.Hash
+	runtime
 }
 
 type RawAddress interface {
 	Address
 	Dependencies() ([]hcl.Traversal, hcl.Diagnostics)
-	Decode(ctx *hcl.EvalContext) ([]Action, hcl.Diagnostics)
+	Decode(ctx *hcl.EvalContext) (Action, hcl.Diagnostics)
 }
 
 func AddressToString[T Address](addr T) string {
@@ -85,7 +82,7 @@ func NewLogger(addr Address) *log.Logger {
 
 type Actions []Action
 
-func (actions Actions) Context() map[string]cty.Value {
+func (actions Actions) EvalContext() map[string]cty.Value {
 	variables := map[string]cty.Value{}
 	data := map[string]cty.Value{}
 	local := map[string]cty.Value{}

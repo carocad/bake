@@ -2,20 +2,23 @@ package config
 
 import (
 	"bake/internal/lang/schema"
+	"context"
 	"fmt"
 	"os"
 	"strings"
 
 	"github.com/hashicorp/hcl/v2"
 	"github.com/zclconf/go-cty/cty"
+	"golang.org/x/sync/errgroup"
 )
 
 type State struct {
-	CWD         string
-	args        []string
-	Flags       StateFlags
-	Parallelism uint8
-	Lock        *Lock
+	CWD     string
+	Context context.Context
+	args    []string
+	Flags   StateFlags
+	Lock    *Lock
+	Group   *errgroup.Group
 }
 
 type StateFlags struct {
@@ -38,7 +41,10 @@ func NewStateFlags(dry, prune, force bool) (StateFlags, error) {
 
 const DefaultParallelism = 4
 
-func NewState() (*State, error) {
+func NewState(ctx context.Context) (*State, error) {
+	bounded, ctx := errgroup.WithContext(ctx)
+	// todo: read this from env vars or similar
+	bounded.SetLimit(DefaultParallelism)
 	// where are we?
 	cwd, err := os.Getwd()
 	if err != nil {
@@ -52,10 +58,11 @@ func NewState() (*State, error) {
 	}
 
 	return &State{
-		CWD:         cwd,
-		args:        os.Args,
-		Lock:        lock,
-		Parallelism: DefaultParallelism,
+		CWD:     cwd,
+		args:    os.Args,
+		Lock:    lock,
+		Context: ctx,
+		Group:   bounded,
 	}, nil
 }
 
