@@ -41,6 +41,15 @@ func (promise *Promise[T]) Wait() (T, error) {
 	return promise.value, promise.err
 }
 
+// Await for all promises to complete on a separate goroutine, it might block waiting
+// for a group goroutine to be available
+func Await[T any](group *errgroup.Group, promises ...*Promise[T]) *Promise[[]T] {
+	return NewWithGroup(group, func() ([]T, error) {
+		return Wait(promises...)
+	})
+}
+
+// Wait for promises to complete blocking until all are ready
 func Wait[T any](promises ...*Promise[T]) ([]T, error) {
 	result := make([]T, len(promises))
 	for index, p := range promises {
