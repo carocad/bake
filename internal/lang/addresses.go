@@ -109,7 +109,7 @@ func (n addressBlock) Dependencies() ([]hcl.Traversal, hcl.Diagnostics) {
 func (addr addressBlock) Decode(ctx *hcl.EvalContext) (Action, hcl.Diagnostics) {
 	switch addr.Block.Type {
 	case schema.TaskLabel:
-		tasks, diagnostics := newTaskContainer(addr, ctx)
+		tasks, diagnostics := newTask(addr, ctx)
 		if diagnostics.HasErrors() {
 			return nil, diagnostics
 		}
@@ -127,15 +127,7 @@ func (addr addressBlock) Decode(ctx *hcl.EvalContext) (Action, hcl.Diagnostics) 
 	}
 }
 
-type runtime interface {
-	Apply(*config.State) *sync.WaitGroup
-}
-
-type instance interface {
-	Apply(*config.State) hcl.Diagnostics
-}
-
-func applyIndexed(instances []instance, state *config.State) *sync.WaitGroup {
+func applyIndexed[T RuntimeInstance](instances []T, state *config.State) *sync.WaitGroup {
 	wait := &sync.WaitGroup{}
 	for _, app := range instances {
 		app := app
@@ -155,7 +147,7 @@ func applyIndexed(instances []instance, state *config.State) *sync.WaitGroup {
 	return wait
 }
 
-func applySingle(instance instance, state *config.State) *sync.WaitGroup {
+func applySingle(instance RuntimeInstance, state *config.State) *sync.WaitGroup {
 	wait := &sync.WaitGroup{}
 	wait.Add(1)
 	state.Group.Go(func() error {

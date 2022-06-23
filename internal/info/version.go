@@ -5,8 +5,8 @@ import "time"
 
 const (
   Version  = ""
-  Revision = "8ac7d38"
-  Branch = "main"
+  Revision = "6355ed7"
+  Branch = "for_each"
 )
 
 var CompiledAt = time.Now()

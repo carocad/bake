@@ -47,14 +47,14 @@ type Local struct {
 	value cty.Value
 }
 
-func (l Local) Apply(state *config.State) (*sync.WaitGroup, hcl.Diagnostics) {
-	return nil, nil
+func (l Local) Apply(state *config.State) *sync.WaitGroup {
+	return nil
 }
 
 func (l Local) CTY() cty.Value {
 	return l.value
 }
 
-func (l Local) Hash() *config.Hash {
+func (l Local) Hash() []config.Hash {
 	return nil
 }

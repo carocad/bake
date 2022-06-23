@@ -123,7 +123,7 @@ func (coordinator *Coordinator) Do(state *config.State, task lang.RawAddress, ad
 
 func (coordinator *Coordinator) waitFor(dependencies []lang.RawAddress) hcl.Diagnostics {
 	for _, dep := range dependencies {
-		waiter, ok := coordinator.waiting.Get(dep)
+		group, ok := coordinator.waiting.Get(dep)
 		if !ok {
 			return hcl.Diagnostics{{
 				Severity: hcl.DiagError,
@@ -132,7 +132,11 @@ func (coordinator *Coordinator) waitFor(dependencies []lang.RawAddress) hcl.Diag
 			}}
 		}
 
-		waiter.Wait()
+		if group == nil {
+			continue
+		}
+
+		group.Wait()
 	}
 
 	return nil

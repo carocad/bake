@@ -1,59 +1,70 @@
 package lang
 
 import (
-	"context"
 	"fmt"
-	"hash/crc64"
-	"os"
-	"path/filepath"
-	"strconv"
 	"sync"
 
 	"bake/internal/concurrent"
 	"bake/internal/lang/config"
 	"bake/internal/lang/meta"
 	"bake/internal/lang/schema"
-	"bake/internal/lang/values"
 
 	"github.com/hashicorp/hcl/v2"
-	"github.com/hashicorp/hcl/v2/gohcl"
 	"github.com/zclconf/go-cty/cty"
 	"github.com/zclconf/go-cty/cty/convert"
 	"github.com/zclconf/go-cty/cty/gocty"
 	"golang.org/x/exp/maps"
 )
 
-type TaskContainer struct {
-	Name string
-	// todo: how can I get this?
-	// Description string `hcl:"description,optional"`
-
-	metadata taskMetadata
-
-	namedInstances   map[string]instance
-	indexedInstances []instance
-	singleInstance   instance
+type Task struct {
+	Name             string
+	metadata         taskMetadata
+	namedInstances   map[string]*TaskInstance // for_each
+	indexedInstances []*TaskInstance          // count?
+	singleInstance   *TaskInstance            // plain task
 }
 
-func newTaskContainer(raw addressBlock, ctx *hcl.EvalContext) (Action, hcl.Diagnostics) {
-	forEachEntries, diags := getForEachEntries(raw, ctx)
+type taskMetadata struct {
+	// manual metadata
+	Block hcl.Range
+	// metadata from block
+	// Description cannot be fetch from Block since it was already decoded
+	Command   hcl.Range
+	Creates   hcl.Range
+	Sources   hcl.Range
+	Remain    hcl.Range
+	DependsOn hcl.Range
+}
+
+func newTask(raw addressBlock, eval *hcl.EvalContext) (Action, hcl.Diagnostics) {
+	path := cty.GetAttrPath(raw.GetName())
+	metadata := taskMetadata{Block: raw.Block.DefRange}
+	diags := meta.DecodeRange(raw.Block.Body, eval, &metadata)
+	if diags.HasErrors() {
+		return nil, diags
+	}
+
+	forEachEntries, diags := getForEachEntries(raw, eval)
 	if diags.HasErrors() {
 		return nil, diags
 	}
 
 	if forEachEntries == nil {
-		task, diags := newTask(raw, ctx)
+		task, diags := newTaskInstance(path, &metadata, raw.Block.Body, eval)
 		if diags.HasErrors() {
 			return nil, diags
 		}
 
-		return task, nil
+		return &Task{
+			Name:           raw.GetName(),
+			singleInstance: task,
+		}, nil
 	}
 
-	instances := map[string]instance{}
+	instances := map[string]*TaskInstance{}
 	for key, value := range forEachEntries {
-		ctx := eachContext(key, value, ctx.NewChild())
-		task, diags := newTask(key, raw, ctx)
+		ctx := eachContext(key, value, eval.NewChild())
+		task, diags := newTaskInstance(path.IndexString(key), &metadata, raw.Block.Body, ctx)
 		if diags.HasErrors() {
 			return nil, diags
 		}
@@ -61,7 +72,7 @@ func newTaskContainer(raw addressBlock, ctx *hcl.EvalContext) (Action, hcl.Diagn
 		instances[key] = task
 	}
 
-	return &TaskContainer{
+	return &Task{
 		Name:           raw.GetName(),
 		namedInstances: instances,
 	}, nil
@@ -132,19 +143,19 @@ func eachContext(key, value string, context *hcl.EvalContext) *hcl.EvalContext {
 	return context
 }
 
-func (t TaskContainer) GetName() string {
+func (t Task) GetName() string {
 	return t.Name
 }
 
-func (t TaskContainer) GetPath() cty.Path {
+func (t Task) GetPath() cty.Path {
 	return cty.GetAttrPath(t.GetName())
 }
 
-func (t TaskContainer) GetFilename() string {
+func (t Task) GetFilename() string {
 	return t.metadata.Block.Filename
 }
 
-func (t TaskContainer) CTY() cty.Value {
+func (t Task) CTY() cty.Value {
 	if len(t.namedInstances) > 0 {
 		m := map[string]cty.Value{}
 		for k, instance := range t.namedInstances {
@@ -155,8 +166,8 @@ func (t TaskContainer) CTY() cty.Value {
 	}
 
 	if len(t.indexedInstances) > 0 {
-		m := make([]cty.Value, len(t.namedInstances))
-		for index, instance := range t.namedInstances {
+		m := make([]cty.Value, len(t.indexedInstances))
+		for index, instance := range t.indexedInstances {
 			m[index] = instance.CTY()
 		}
 
@@ -166,7 +177,7 @@ func (t TaskContainer) CTY() cty.Value {
 	return t.singleInstance.CTY()
 }
 
-func (t *TaskContainer) Apply(state *config.State) *sync.WaitGroup {
+func (t *Task) Apply(state *config.State) *sync.WaitGroup {
 	if len(t.namedInstances) > 0 {
 		return applyIndexed(maps.Values(t.namedInstances), state)
 	}
@@ -176,164 +187,29 @@ func (t *TaskContainer) Apply(state *config.State) *sync.WaitGroup {
 	}
 
 	return applySingle(t.singleInstance, state)
-
 }
 
-type Task struct {
-	Command  string            `hcl:"command,optional"`
-	Creates  string            `hcl:"creates,optional"`
-	Sources  []string          `hcl:"sources,optional"`
-	Env      map[string]string `hcl:"env,optional"`
-	Remain   hcl.Body          `hcl:",remain"`
-	ExitCode values.EventualInt64
-}
-
-type taskMetadata struct {
-	// manual metadata
-	Block hcl.Range
-	// metadata from block
-	// Description cannot be fetch from Block since it was already decoded
-	Command   hcl.Range
-	Creates   hcl.Range
-	Sources   hcl.Range
-	Remain    hcl.Range
-	DependsOn hcl.Range
-}
-
-func newTask(key string, raw addressBlock, ctx *hcl.EvalContext) (*Task, hcl.Diagnostics) {
-	metadata := taskMetadata{Block: raw.Block.DefRange}
-	diags := meta.DecodeRange(raw.Block.Body, ctx, &metadata)
-	if diags.HasErrors() {
-		return nil, diags
-	}
-
-	task := &Task{metadata: metadata}
-	diags = gohcl.DecodeBody(raw.Block.Body, ctx, task)
-	if diags.HasErrors() {
-		return nil, diags
-	}
-
-	diags = verifyAttributes(task.Remain)
-	if diags.HasErrors() {
-		return nil, diags
-	}
-
-	// make sure that irrelevant changes dont taint the state (example from ./dir/file to dir/file)
-	if task.Creates != "" {
-		task.Creates = filepath.Clean(task.Creates)
-	}
-
-	// overwrite default env with custom values
-	task.Env = concurrent.Merge(config.Env(), task.Env)
-	return task, nil
-}
-
-func (t Task) Hash() interface{} {
-	// somehow iterating over the map creates undeterministic results
-	env := crc64.Checksum([]byte(fmt.Sprintf("%#v", t.Env)), crc64.MakeTable(crc64.ISO))
-	command := crc64.Checksum([]byte(fmt.Sprintf("%#v", []byte(t.Command))), crc64.MakeTable(crc64.ISO))
-
-	return &config.Hash{
-		Creates: t.Creates,
-		Command: strconv.FormatUint(command, 16),
-		Env:     strconv.FormatUint(env, 16),
-		Dirty:   !t.ExitCode.Valid || t.ExitCode.Int64 != 0,
-	}
-}
-
-func (t *Task) Apply(ctx context.Context, state *config.State) hcl.Diagnostics {
-	// don't apply twice in case more than 1 task depends on this
-	if t.ExitCode.Valid || t.Command == "" {
-		return nil
-	}
-
-	log := NewLogger(t)
-	if state.Flags.Prune {
-		shouldRun, description, diags := t.dryPrune(state)
-		if diags.HasErrors() {
-			return diags
+func (t *Task) Hash() []config.Hash {
+	result := make([]config.Hash, 0)
+	if len(t.namedInstances) > 0 {
+		for _, ri := range t.namedInstances {
+			hash := ri.Hash()
+			result = append(result, hash)
 		}
 
-		log.Println(description)
-		if state.Flags.Dry {
-			return nil
+		return result
+	}
+
+	if len(t.indexedInstances) > 0 {
+		for _, ri := range t.indexedInstances {
+			hash := ri.Hash()
+			result = append(result, hash)
 		}
 
-		if !shouldRun && !state.Flags.Force {
-			return nil
-		}
-
-		return t.prune(log)
+		return result
 	}
 
-	// run by default
-	shouldRun, description, diags := t.dryRun(state)
-	if diags.HasErrors() {
-		return diags
-	}
-
-	log.Println(description)
-	if state.Flags.Dry {
-		return nil
-	}
-
-	if !shouldRun && !state.Flags.Force {
-		return nil
-	}
-
-	diags = t.run(ctx, log)
-	if diags.HasErrors() {
-		return diags
-	}
-
-	// do we need to prune old stuff?
-	oldHash, ok := state.Lock.Tasks[AddressToString(t)]
-	if !ok {
-		return nil
-	}
-
-	if t.Creates == oldHash.Creates {
-		return nil
-	}
-
-	err := os.RemoveAll(oldHash.Creates)
-	if err != nil {
-		return hcl.Diagnostics{{
-			Severity: hcl.DiagError,
-			Summary:  fmt.Sprintf(`error pruning %s task's old "creates": %s`, AddressToString(t), oldHash.Creates),
-			Detail:   err.Error(),
-			Subject:  &t.metadata.Creates,
-			Context:  &t.metadata.Block,
-		}}
-	}
-
-	return nil
-}
-
-func verifyAttributes(body hcl.Body) hcl.Diagnostics {
-	attrs, diags := body.JustAttributes()
-	if diags.HasErrors() {
-		return diags
-	}
-
-	for _, attr := range attrs {
-		if attr.Name == schema.DependsOnAttr {
-			_, diags := schema.TupleOfReferences(attrs[schema.DependsOnAttr])
-			return diags
-		}
-
-		if attr.Name == schema.ForEachAttr {
-			continue
-		}
-
-		// only depends on is allowed
-		return hcl.Diagnostics{{
-			Severity: hcl.DiagError,
-			Summary:  "Unsupported argument",
-			Detail:   fmt.Sprintf(`An argument named "%s" is not expected here`, attr.Name),
-			Subject:  attr.Expr.Range().Ptr(),
-		}}
-	}
-
-	return nil
+	hash := t.singleInstance.Hash()
+	result = append(result, hash)
+	return result
 }

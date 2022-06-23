@@ -19,14 +19,14 @@ const (
 type Lock struct {
 	Version   string
 	Timestamp time.Time
-	Tasks     map[string]Hash
+	Tasks     []Hash
 }
 
 func newLock() *Lock {
 	return &Lock{
 		Version:   info.Version,
 		Timestamp: time.Now(),
-		Tasks:     make(map[string]Hash),
+		Tasks:     make([]Hash, 0),
 	}
 }
 
@@ -51,25 +51,40 @@ func lockFromFilesystem(cwd string) (*Lock, error) {
 	return &lock, nil
 }
 
-type Hasher interface {
-	Hash() (cty.Path, interface{})
-}
-
-func (lock *Lock) Update(hashes []Hasher) {
+func (lock *Lock) Update(hasher Hasher) {
 	lock.Version = info.Version
 	lock.Timestamp = time.Now()
-	for _, hasher := range hashes {
-		path, hash := hasher.Hash()
-		if hash == nil {
+	hashes := hasher.Hash()
+	for _, hash := range hashes {
+		if hash.Dirty || hash.Creates == "" {
 			continue
 		}
 
-		if hash.Dirty || hasher.Creates == "" {
-			continue
+		found := false
+		for index, oldHash := range lock.Tasks {
+			// update the hash if it already exist
+			if oldHash.Path == hash.Path {
+				lock.Tasks[index] = hash
+				found = true
+				break
+			}
 		}
 
-		lock.Tasks[paths.String(hasher.Path)] = *hasher
+		if !found {
+			// create it otherwise
+			lock.Tasks = append(lock.Tasks, hash)
+		}
 	}
+}
+
+func (lock *Lock) Get(path cty.Path) (*Hash, bool) {
+	for _, hash := range lock.Tasks {
+		if hash.Path == paths.String(path) {
+			return &hash, true
+		}
+	}
+
+	return nil, false
 }
 
 func (lock *Lock) Store(cwd string) error {
@@ -90,7 +105,13 @@ func (lock *Lock) Store(cwd string) error {
 	return encoder.Encode(lock)
 }
 
+type Hasher interface {
+	Hash() []Hash
+}
+
 type Hash struct {
+	// Path is the absolute path used to refer to the parent task (ex: hello["world"])
+	Path string
 	// Dirty flags a Hash as comming from a Task that might have not exit correctly
 	Dirty bool `json:"-"`
 	// Creates keep a ref to the old filename in case it is renamed

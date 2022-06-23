@@ -66,12 +66,10 @@ func Do(taskName string, state *config.State, addrs []lang.RawAddress) hcl.Diagn
 		return diags
 	}
 
-	hashes := make([]*config.Hash, len(actions))
-	for index, action := range actions {
-		hashes[index] = action.Hash()
+	for _, action := range actions {
+		state.Lock.Update(action)
 	}
 
-	state.Lock.Update(hashes)
 	err := state.Lock.Store(state.CWD)
 	if err != nil {
 		diags.Append(&hcl.Diagnostic{

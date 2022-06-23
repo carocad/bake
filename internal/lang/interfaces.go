@@ -2,11 +2,13 @@ package lang
 
 import (
 	"bake/internal/concurrent"
+	"bake/internal/lang/config"
 	"bake/internal/lang/schema"
 	"bake/internal/lang/values"
 	"bake/internal/paths"
 	"log"
 	"os"
+	"sync"
 
 	"github.com/hashicorp/hcl/v2"
 	"github.com/hashicorp/hcl/v2/gohcl"
@@ -24,7 +26,16 @@ type Address interface {
 type Action interface {
 	Address
 	values.Cty
-	runtime
+	RuntimeAction
+	config.Hasher
+}
+
+type RuntimeAction interface {
+	Apply(*config.State) *sync.WaitGroup
+}
+
+type RuntimeInstance interface {
+	Apply(*config.State) hcl.Diagnostics
 }
 
 type RawAddress interface {
@@ -74,8 +85,8 @@ func GetPublicTasks(addrs []RawAddress) []CliCommand {
 	return commands
 }
 
-func NewLogger(addr Address) *log.Logger {
-	prefix := colorstring.Color("[bold]" + AddressToString(addr))
+func NewLogger(path cty.Path) *log.Logger {
+	prefix := colorstring.Color("[bold]" + paths.String(path))
 	// todo: change stdout according to state
 	return log.New(os.Stdout, prefix+": ", 0)
 }

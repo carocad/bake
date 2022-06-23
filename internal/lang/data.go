@@ -48,69 +48,77 @@ func (d data) CTY() cty.Value {
 	return cty.ObjectVal(m)
 }
 
-func (d data) Hash() *config.Hash {
+func (d data) Hash() []config.Hash {
 	return nil
 }
 
-func (d *data) Apply(state *config.State) (*sync.WaitGroup, hcl.Diagnostics) {
-	if d.ExitCode.Valid { // apply data even on dry run
-		return nil, nil
-	}
+func (d *data) Apply(state *config.State) *sync.WaitGroup {
+	wait := &sync.WaitGroup{}
+	wait.Add(1)
+	state.Group.Go(func() error {
+		defer wait.Done()
 
-	log := NewLogger(d)
-	log.Println(`refreshing ...`)
-	// which shell should I use?
-	terminal := "bash"
-	shell, ok := os.LookupEnv("SHELL")
-	if ok {
-		terminal = shell
-	}
+		if d.ExitCode.Valid { // apply data even on dry run
+			return nil
+		}
 
-	// use shell with fail fast flags
-	script := fmt.Sprintf(`
-	set -euo pipefail
+		log := NewLogger(d.GetPath())
+		log.Println(`refreshing ...`)
+		// which shell should I use?
+		terminal := "bash"
+		shell, ok := os.LookupEnv("SHELL")
+		if ok {
+			terminal = shell
+		}
 
-	%s`, d.Command)
-	command := exec.CommandContext(state.Context, terminal, "-c", script)
-	command.Env = config.EnvSlice(d.Env)
-	// todo: should I allow configuring these?
-	var stdout, stderr bytes.Buffer
-	command.Stdout = &stdout
-	command.Stderr = &stderr
-	start := time.Now()
-	err := command.Run()
-	end := time.Now()
-	// store results
-	d.StdOut = values.EventualString{
-		String: strings.TrimSpace(stdout.String()),
-		Valid:  true,
-	}
+		// use shell with fail fast flags
+		script := fmt.Sprintf(`
+		set -euo pipefail
+	
+		%s`, d.Command)
+		command := exec.CommandContext(state.Context, terminal, "-c", script)
+		command.Env = config.EnvSlice(d.Env)
+		// todo: should I allow configuring these?
+		var stdout, stderr bytes.Buffer
+		command.Stdout = &stdout
+		command.Stderr = &stderr
+		start := time.Now()
+		err := command.Run()
+		end := time.Now()
+		// store results
+		d.StdOut = values.EventualString{
+			String: strings.TrimSpace(stdout.String()),
+			Valid:  true,
+		}
 
-	d.StdErr = values.EventualString{
-		String: strings.TrimSpace(stderr.String()),
-		Valid:  true,
-	}
+		d.StdErr = values.EventualString{
+			String: strings.TrimSpace(stderr.String()),
+			Valid:  true,
+		}
 
-	d.ExitCode = values.EventualInt64{
-		Int64: int64(command.ProcessState.ExitCode()),
-		Valid: true,
-	}
+		d.ExitCode = values.EventualInt64{
+			Int64: int64(command.ProcessState.ExitCode()),
+			Valid: true,
+		}
 
-	detail := d.StdErr.String
-	if detail == "" {
-		detail = d.StdOut.String
-	}
+		detail := d.StdErr.String
+		if detail == "" {
+			detail = d.StdOut.String
+		}
 
-	if err != nil {
-		return nil, hcl.Diagnostics{{
-			Severity: hcl.DiagError,
-			Summary:  fmt.Sprintf(`"%s" command failed with: %s`, AddressToString(d), command.ProcessState.String()),
-			Detail:   detail,
-			Subject:  schema.GetRangeFor(d.Block, schema.CommandAttr),
-			Context:  d.Block.DefRange.Ptr(),
-		}}
-	}
+		if err != nil {
+			return hcl.Diagnostics{{
+				Severity: hcl.DiagError,
+				Summary:  fmt.Sprintf(`"%s" command failed with: %s`, AddressToString(d), command.ProcessState.String()),
+				Detail:   detail,
+				Subject:  schema.GetRangeFor(d.Block, schema.CommandAttr),
+				Context:  d.Block.DefRange.Ptr(),
+			}}
+		}
 
-	log.Println(`done in ` + end.Sub(start).String())
-	return nil, nil
+		log.Println(`done in ` + end.Sub(start).String())
+		return nil
+	})
+
+	return wait
 }
