@@ -18,7 +18,6 @@ import (
 )
 
 type Address interface {
-	GetName() string
 	GetPath() cty.Path
 	GetFilename() string
 }

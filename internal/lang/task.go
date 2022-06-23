@@ -17,7 +17,7 @@ import (
 )
 
 type Task struct {
-	Name             string
+	path             cty.Path
 	metadata         taskMetadata
 	namedInstances   map[string]*TaskInstance // for_each
 	indexedInstances []*TaskInstance          // count?
@@ -37,7 +37,7 @@ type taskMetadata struct {
 }
 
 func newTask(raw addressBlock, eval *hcl.EvalContext) (Action, hcl.Diagnostics) {
-	path := cty.GetAttrPath(raw.GetName())
+	path := raw.GetPath()
 	metadata := taskMetadata{Block: raw.Block.DefRange}
 	diags := meta.DecodeRange(raw.Block.Body, eval, &metadata)
 	if diags.HasErrors() {
@@ -56,7 +56,7 @@ func newTask(raw addressBlock, eval *hcl.EvalContext) (Action, hcl.Diagnostics) 
 		}
 
 		return &Task{
-			Name:           raw.GetName(),
+			path:           path,
 			singleInstance: task,
 		}, nil
 	}
@@ -73,7 +73,7 @@ func newTask(raw addressBlock, eval *hcl.EvalContext) (Action, hcl.Diagnostics) 
 	}
 
 	return &Task{
-		Name:           raw.GetName(),
+		path:           path,
 		namedInstances: instances,
 	}, nil
 }
@@ -143,12 +143,8 @@ func eachContext(key, value string, context *hcl.EvalContext) *hcl.EvalContext {
 	return context
 }
 
-func (t Task) GetName() string {
-	return t.Name
-}
-
 func (t Task) GetPath() cty.Path {
-	return cty.GetAttrPath(t.GetName())
+	return t.path
 }
 
 func (t Task) GetFilename() string {

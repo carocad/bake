@@ -80,16 +80,13 @@ func (n addressBlock) GetFilename() string {
 	return n.Block.DefRange.Filename
 }
 
-func (n addressBlock) GetName() string {
-	return n.Block.Labels[0]
-}
-
 func (n addressBlock) GetPath() cty.Path {
+	name := n.Block.Labels[0]
 	if n.Block.Type == schema.TaskLabel {
-		return cty.GetAttrPath(n.GetName())
+		return cty.GetAttrPath(name)
 	}
 
-	return cty.GetAttrPath(n.Block.Type).GetAttr(n.GetName())
+	return cty.GetAttrPath(n.Block.Type).GetAttr(name)
 }
 
 func (n addressBlock) Dependencies() ([]hcl.Traversal, hcl.Diagnostics) {

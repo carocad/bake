@@ -42,10 +42,7 @@ func newData(raw addressBlock, ctx *hcl.EvalContext) (*data, hcl.Diagnostics) {
 }
 
 func (d data) CTY() cty.Value {
-	value := values.StructToCty(d)
-	m := value.AsValueMap()
-	m[schema.NameLabel] = cty.StringVal(d.GetName())
-	return cty.ObjectVal(m)
+	return values.StructToCty(d)
 }
 
 func (d data) Hash() []config.Hash {

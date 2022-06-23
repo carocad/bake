@@ -18,10 +18,6 @@ func (a addressAttribute) GetFilename() string {
 	return a.expr.Range().Filename
 }
 
-func (a addressAttribute) GetName() string {
-	return a.name
-}
-
 func (a addressAttribute) GetPath() cty.Path {
 	return cty.GetAttrPath(a.label).GetAttr(a.name)
 }
