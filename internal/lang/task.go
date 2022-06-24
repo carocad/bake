@@ -119,6 +119,7 @@ func (t Task) CTY() cty.Value {
 func (t *Task) Apply(state *config.State) *sync.WaitGroup {
 	if len(t.namedInstances) > 0 {
 		return applyIndexed(maps.Values(t.namedInstances), state)
+
 	}
 
 	if len(t.indexedInstances) > 0 {
@@ -134,6 +135,7 @@ func (t *Task) Hash() []config.Hash {
 		for _, ri := range t.namedInstances {
 			hash := ri.Hash()
 			result = append(result, hash)
+
 		}
 
 		return result
