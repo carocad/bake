@@ -2,55 +2,50 @@ package lang
 
 import (
 	"bake/internal/lang/config"
+	"bake/internal/lang/schema"
 	"sync"
 
 	"github.com/hashicorp/hcl/v2"
 	"github.com/zclconf/go-cty/cty"
 )
 
-type addressAttribute struct {
+type Local struct {
 	name  string
-	label string
 	expr  hcl.Expression
+	value cty.Value
 }
 
-func (a addressAttribute) GetFilename() string {
-	return a.expr.Range().Filename
+func (local Local) GetFilename() string {
+	return local.expr.Range().Filename
 }
 
-func (a addressAttribute) GetPath() cty.Path {
-	return cty.GetAttrPath(a.label).GetAttr(a.name)
+func (local Local) GetPath() cty.Path {
+	return cty.GetAttrPath(schema.LocalScope).GetAttr(local.name)
 }
 
-func (a addressAttribute) Dependencies() ([]hcl.Traversal, hcl.Diagnostics) {
-	return a.expr.Variables(), nil
+func (local Local) Dependencies() ([]hcl.Traversal, hcl.Diagnostics) {
+	return local.expr.Variables(), nil
 }
 
-func (a addressAttribute) Decode(ctx *hcl.EvalContext) (Action, hcl.Diagnostics) {
-	value, diagnostics := a.expr.Value(ctx)
+func (local Local) Decode(ctx *hcl.EvalContext) (Action, hcl.Diagnostics) {
+	newLocal := local
+	value, diagnostics := local.expr.Value(ctx)
 	if diagnostics.HasErrors() {
 		return nil, diagnostics
 	}
 
-	return Local{
-		addressAttribute: a,
-		value:            value,
-	}, nil
+	newLocal.value = value
+	return newLocal, nil
 }
 
-type Local struct {
-	addressAttribute
-	value cty.Value
-}
-
-func (l Local) Apply(state *config.State) *sync.WaitGroup {
+func (local Local) Apply(state *config.State) *sync.WaitGroup {
 	return nil
 }
 
-func (l Local) CTY() cty.Value {
-	return l.value
+func (local Local) CTY() cty.Value {
+	return local.value
 }
 
-func (l Local) Hash() []config.Hash {
+func (local Local) Hash() []config.Hash {
 	return nil
 }

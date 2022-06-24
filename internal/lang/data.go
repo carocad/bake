@@ -24,7 +24,7 @@ import (
 
 type data struct {
 	path     cty.Path
-	metadata dataMetadata
+	filename string
 
 	namedInstances   map[string]*dataInstance // for_each
 	indexedInstances []*dataInstance          // count?
@@ -59,7 +59,7 @@ func newData(raw addressBlock, eval *hcl.EvalContext) (Action, hcl.Diagnostics) 
 
 		return &data{
 			path:           path,
-			metadata:       metadata,
+			filename:       metadata.Block.Filename,
 			singleInstance: instance,
 		}, nil
 	}
@@ -77,7 +77,7 @@ func newData(raw addressBlock, eval *hcl.EvalContext) (Action, hcl.Diagnostics) 
 
 	return &data{
 		path:           path,
-		metadata:       metadata,
+		filename:       metadata.Block.Filename,
 		namedInstances: instances,
 	}, nil
 }
@@ -87,7 +87,7 @@ func (d data) GetPath() cty.Path {
 }
 
 func (d data) GetFilename() string {
-	return d.metadata.Block.Filename
+	return d.filename
 }
 
 func (d data) CTY() cty.Value {

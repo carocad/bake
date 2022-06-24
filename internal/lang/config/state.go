@@ -21,24 +21,6 @@ type State struct {
 	Group   *errgroup.Group
 }
 
-type StateFlags struct {
-	Dry   bool
-	Prune bool
-	Force bool
-}
-
-func NewStateFlags(dry, prune, force bool) (StateFlags, error) {
-	if dry && force {
-		return StateFlags{}, fmt.Errorf(`"dry" and "force" are contradictory flags`)
-	}
-
-	return StateFlags{
-		Dry:   dry,
-		Prune: prune,
-		Force: force,
-	}, nil
-}
-
 const DefaultParallelism = 4
 
 func NewState(ctx context.Context) (*State, error) {
@@ -66,27 +48,6 @@ func NewState(ctx context.Context) (*State, error) {
 	}, nil
 }
 
-func Env() map[string]string {
-	// organize out env vars
-	env := map[string]string{}
-	for _, keyVal := range os.Environ() {
-		parts := strings.SplitN(keyVal, "=", 2)
-		key, val := parts[0], parts[1]
-		env[key] = val
-	}
-
-	return env
-}
-
-func EnvSlice(input map[string]string) []string {
-	env := make([]string, 0)
-	for k, v := range input {
-		env = append(env, k+"="+v)
-	}
-
-	return env
-}
-
 func (state State) EvalContext() *hcl.EvalContext {
 	args := make([]cty.Value, len(state.args))
 	for index, arg := range state.args {
@@ -110,4 +71,43 @@ func (state State) EvalContext() *hcl.EvalContext {
 		Functions: schema.Functions(),
 	}
 	return ctx.NewChild()
+}
+
+type StateFlags struct {
+	Dry   bool
+	Prune bool
+	Force bool
+}
+
+func NewStateFlags(dry, prune, force bool) (StateFlags, error) {
+	if dry && force {
+		return StateFlags{}, fmt.Errorf(`"dry" and "force" are contradictory flags`)
+	}
+
+	return StateFlags{
+		Dry:   dry,
+		Prune: prune,
+		Force: force,
+	}, nil
+}
+
+func Env() map[string]string {
+	// organize out env vars
+	env := map[string]string{}
+	for _, keyVal := range os.Environ() {
+		parts := strings.SplitN(keyVal, "=", 2)
+		key, val := parts[0], parts[1]
+		env[key] = val
+	}
+
+	return env
+}
+
+func EnvSlice(input map[string]string) []string {
+	env := make([]string, 0)
+	for k, v := range input {
+		env = append(env, k+"="+v)
+	}
+
+	return env
 }

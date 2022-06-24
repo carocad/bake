@@ -33,10 +33,9 @@ func NewPartialAddress(block *hcl.Block) ([]RawAddress, hcl.Diagnostics) {
 
 		addrs := make([]RawAddress, 0)
 		for name, attribute := range attributes {
-			addrs = append(addrs, addressAttribute{
-				name:  name,
-				label: schema.LocalScope,
-				expr:  attribute.Expr,
+			addrs = append(addrs, Local{
+				name: name,
+				expr: attribute.Expr,
 			})
 		}
 

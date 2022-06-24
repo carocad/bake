@@ -22,6 +22,23 @@ type Lock struct {
 	Tasks     []Hash
 }
 
+type Hasher interface {
+	Hash() []Hash
+}
+
+type Hash struct {
+	// Path is the absolute path used to refer to the parent task (ex: hello["world"])
+	Path string
+	// Dirty flags a Hash as comming from a Task that might have not exit correctly
+	Dirty bool `json:"-"`
+	// Creates keep a ref to the old filename in case it is renamed
+	Creates string
+	// Env hash just to check if it changes between executions
+	Env string
+	// Command hash just to check if it changes between executions
+	Command string
+}
+
 func newLock() *Lock {
 	return &Lock{
 		Version:   info.Version,
@@ -103,21 +120,4 @@ func (lock *Lock) Store(cwd string) error {
 	encoder := json.NewEncoder(file)
 	encoder.SetIndent("", "  ")
 	return encoder.Encode(lock)
-}
-
-type Hasher interface {
-	Hash() []Hash
-}
-
-type Hash struct {
-	// Path is the absolute path used to refer to the parent task (ex: hello["world"])
-	Path string
-	// Dirty flags a Hash as comming from a Task that might have not exit correctly
-	Dirty bool `json:"-"`
-	// Creates keep a ref to the old filename in case it is renamed
-	Creates string
-	// Env hash just to check if it changes between executions
-	Env string
-	// Command hash just to check if it changes between executions
-	Command string
 }
