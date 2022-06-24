@@ -10,10 +10,10 @@ import (
 	"github.com/zclconf/go-cty/cty"
 )
 
-func NewPartialAddress(block *hcl.Block) ([]RawAddress, hcl.Diagnostics) {
+func NewPartialAddress(block *hcl.Block) ([]config.RawAddress, hcl.Diagnostics) {
 	switch block.Type {
 	case schema.DataLabel:
-		return []RawAddress{addressBlock{
+		return []config.RawAddress{addressBlock{
 			Block: block,
 		}}, nil
 	case schema.TaskLabel:
@@ -22,7 +22,7 @@ func NewPartialAddress(block *hcl.Block) ([]RawAddress, hcl.Diagnostics) {
 			return nil, diags
 		}
 
-		return []RawAddress{addressBlock{
+		return []config.RawAddress{addressBlock{
 			Block: block,
 		}}, nil
 	case schema.LocalsLabel:
@@ -31,7 +31,7 @@ func NewPartialAddress(block *hcl.Block) ([]RawAddress, hcl.Diagnostics) {
 			return nil, diagnostics
 		}
 
-		addrs := make([]RawAddress, 0)
+		addrs := make([]config.RawAddress, 0)
 		for name, attribute := range attributes {
 			addrs = append(addrs, Local{
 				name: name,
@@ -102,7 +102,7 @@ func (n addressBlock) Dependencies() ([]hcl.Traversal, hcl.Diagnostics) {
 	return deps, nil
 }
 
-func (addr addressBlock) Decode(ctx *hcl.EvalContext) (Action, hcl.Diagnostics) {
+func (addr addressBlock) Decode(ctx *hcl.EvalContext) (config.Action, hcl.Diagnostics) {
 	switch addr.Block.Type {
 	case schema.TaskLabel:
 		tasks, diagnostics := newTask(addr, ctx)
@@ -123,7 +123,7 @@ func (addr addressBlock) Decode(ctx *hcl.EvalContext) (Action, hcl.Diagnostics) 
 	}
 }
 
-func applyIndexed[T RuntimeInstance](instances []T, state *config.State) *sync.WaitGroup {
+func applyIndexed[T config.RuntimeInstance](instances []T, state *config.State) *sync.WaitGroup {
 	wait := &sync.WaitGroup{}
 	for _, app := range instances {
 		app := app
@@ -143,7 +143,7 @@ func applyIndexed[T RuntimeInstance](instances []T, state *config.State) *sync.W
 	return wait
 }
 
-func applySingle(instance RuntimeInstance, state *config.State) *sync.WaitGroup {
+func applySingle(instance config.RuntimeInstance, state *config.State) *sync.WaitGroup {
 	wait := &sync.WaitGroup{}
 	wait.Add(1)
 	state.Group.Go(func() error {

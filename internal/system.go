@@ -15,7 +15,7 @@ import (
 	"github.com/hashicorp/hcl/v2/hclparse"
 )
 
-func ReadRecipes(cwd string, parser *hclparse.Parser) ([]lang.RawAddress, hcl.Diagnostics) {
+func ReadRecipes(cwd string, parser *hclparse.Parser) ([]config.RawAddress, hcl.Diagnostics) {
 	files, err := ioutil.ReadDir(cwd)
 	if err != nil {
 		return nil, hcl.Diagnostics{{
@@ -25,7 +25,7 @@ func ReadRecipes(cwd string, parser *hclparse.Parser) ([]lang.RawAddress, hcl.Di
 		}}
 	}
 
-	addresses := make([]lang.RawAddress, 0)
+	addresses := make([]config.RawAddress, 0)
 	for _, filename := range files {
 		if filepath.Ext(filename.Name()) != ".hcl" { // todo: change to .rcp
 			continue
@@ -54,7 +54,7 @@ func ReadRecipes(cwd string, parser *hclparse.Parser) ([]lang.RawAddress, hcl.Di
 	return addresses, nil
 }
 
-func Do(taskName string, state *config.State, addrs []lang.RawAddress) hcl.Diagnostics {
+func Do(taskName string, state *config.State, addrs []config.RawAddress) hcl.Diagnostics {
 	task, diags := getTask(taskName, addrs)
 	if diags.HasErrors() {
 		return diags
@@ -82,16 +82,16 @@ func Do(taskName string, state *config.State, addrs []lang.RawAddress) hcl.Diagn
 	return diags
 }
 
-func getTask(name string, addresses []lang.RawAddress) (lang.RawAddress, hcl.Diagnostics) {
+func getTask(name string, addresses []config.RawAddress) (config.RawAddress, hcl.Diagnostics) {
 	for _, address := range addresses {
-		if lang.AddressToString(address) != name {
+		if config.AddressToString(address) != name {
 			continue
 		}
 
 		return address, nil
 	}
 
-	options := functional.Map(addresses, lang.AddressToString[lang.RawAddress])
+	options := functional.Map(addresses, config.AddressToString[config.RawAddress])
 	suggestion := functional.Suggest(name, options)
 	summary := "couldn't find any target with name " + name
 	if suggestion != "" {

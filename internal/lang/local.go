@@ -27,7 +27,7 @@ func (local Local) Dependencies() ([]hcl.Traversal, hcl.Diagnostics) {
 	return local.expr.Variables(), nil
 }
 
-func (local Local) Decode(ctx *hcl.EvalContext) (Action, hcl.Diagnostics) {
+func (local Local) Decode(ctx *hcl.EvalContext) (config.Action, hcl.Diagnostics) {
 	newLocal := local
 	value, diagnostics := local.expr.Value(ctx)
 	if diagnostics.HasErrors() {

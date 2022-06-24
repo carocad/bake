@@ -2,7 +2,6 @@ package module
 
 import (
 	"bake/internal/functional"
-	"bake/internal/lang"
 	"bake/internal/lang/config"
 	"context"
 	"fmt"
@@ -43,7 +42,7 @@ func (s fakeAddress) Dependencies() ([]hcl.Traversal, hcl.Diagnostics) {
 	return result, nil
 }
 
-func (s fakeAddress) Decode(ctx *hcl.EvalContext) (lang.Action, hcl.Diagnostics) {
+func (s fakeAddress) Decode(ctx *hcl.EvalContext) (config.Action, hcl.Diagnostics) {
 	return s, nil
 }
 
@@ -56,7 +55,7 @@ func (s fakeAddress) Hash() []config.Hash {
 }
 
 func (s fakeAddress) Plan(state config.State) (bool, string, hcl.Diagnostics) {
-	return true, fmt.Sprintf(`refreshing "%s"`, lang.AddressToString(s)), nil
+	return true, fmt.Sprintf(`refreshing "%s"`, config.AddressToString(s)), nil
 }
 
 func (s fakeAddress) Apply(state *config.State) *sync.WaitGroup {
@@ -75,7 +74,7 @@ func (s fakeAddress) Apply(state *config.State) *sync.WaitGroup {
 func TestSerialCoordination(t *testing.T) {
 	// arrange
 	preData := []string{"1", "2", "3", "4", "5"}
-	data := make([]lang.RawAddress, 0)
+	data := make([]config.RawAddress, 0)
 	for index, value := range preData {
 		data = append(data, fakeAddress{value, preData[:index]})
 	}
@@ -94,11 +93,11 @@ func TestSerialCoordination(t *testing.T) {
 
 	end := time.Now()
 	last := len(actions) - 1
-	if lang.AddressToString(actions[last]) != preData[last] {
+	if config.AddressToString(actions[last]) != preData[last] {
 		t.Errorf("expected an slice of %v but got %v", data[:last], actions[last])
 	}
 
-	if lang.AddressToString(actions[0]) != preData[0] {
+	if config.AddressToString(actions[0]) != preData[0] {
 		t.Errorf("expected an slice of %v but got %v", nil, actions[0])
 	}
 
@@ -110,7 +109,7 @@ func TestSerialCoordination(t *testing.T) {
 
 func TestParallelCoordination(t *testing.T) {
 	preData := []string{"1", "2", "3", "4", "5"}
-	data := make([]lang.RawAddress, 0)
+	data := make([]config.RawAddress, 0)
 	for _, value := range preData {
 		data = append(data, fakeAddress{value, nil})
 	}
@@ -148,7 +147,7 @@ func TestCustomCoordination(t *testing.T) {
 		"5", []string{"4"}, // duration = 0.2 + 0.6 = 0.8
 	}}
 
-	addresses := functional.Map(data, func(f fakeAddress) lang.RawAddress { return f })
+	addresses := functional.Map(data, func(f fakeAddress) config.RawAddress { return f })
 	state, err := config.NewState(context.Background())
 	if err != nil {
 		t.Fatal(err)
@@ -163,12 +162,12 @@ func TestCustomCoordination(t *testing.T) {
 
 	end := time.Now()
 	last := len(actions) - 1
-	if lang.AddressToString(actions[last]) != data[4].name {
-		t.Errorf("expected last action %s but got %s", data[4].GetName(), lang.AddressToString(actions[last]))
+	if config.AddressToString(actions[last]) != data[4].name {
+		t.Errorf("expected last action %s but got %s", data[4].GetName(), config.AddressToString(actions[last]))
 	}
 
-	if lang.AddressToString(actions[0]) != data[0].name && lang.AddressToString(actions[0]) != data[2].name {
-		t.Errorf("expected first action %s but got %s", data[0].name, lang.AddressToString(actions[0]))
+	if config.AddressToString(actions[0]) != data[0].name && config.AddressToString(actions[0]) != data[2].name {
+		t.Errorf("expected first action %s but got %s", data[0].name, config.AddressToString(actions[0]))
 	}
 
 	duration := end.Sub(start)

@@ -31,7 +31,7 @@ type taskMetadata struct {
 	DependsOn hcl.Range
 }
 
-func newTask(raw addressBlock, eval *hcl.EvalContext) (Action, hcl.Diagnostics) {
+func newTask(raw addressBlock, eval *hcl.EvalContext) (config.Action, hcl.Diagnostics) {
 	path := raw.GetPath()
 	metadata := taskMetadata{Block: raw.Block.DefRange}
 	diags := meta.DecodeRange(raw.Block.Body, eval, &metadata)

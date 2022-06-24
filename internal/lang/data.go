@@ -38,7 +38,7 @@ type dataMetadata struct {
 	Env     hcl.Range
 }
 
-func newData(raw addressBlock, eval *hcl.EvalContext) (Action, hcl.Diagnostics) {
+func newData(raw addressBlock, eval *hcl.EvalContext) (config.Action, hcl.Diagnostics) {
 	path := raw.GetPath()
 	metadata := dataMetadata{Block: raw.Block.DefRange}
 	diags := meta.DecodeRange(raw.Block.Body, eval, &metadata)

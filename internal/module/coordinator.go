@@ -2,7 +2,6 @@ package module
 
 import (
 	"bake/internal/concurrent"
-	"bake/internal/lang"
 	"bake/internal/lang/config"
 	"bake/internal/module/topo"
 	"fmt"
@@ -66,30 +65,30 @@ Successfully remade target file 'dev'.
 
 // Coordinator executes tasks in parallel respecting the dependencies between each task
 type Coordinator struct {
-	waiting *concurrent.Map[lang.Address, *sync.WaitGroup]
-	actions *concurrent.Slice[lang.Action]
+	waiting *concurrent.Map[config.Address, *sync.WaitGroup]
+	actions *concurrent.Slice[config.Action]
 }
 
 func NewCoordinator() Coordinator {
 	return Coordinator{
-		waiting: concurrent.NewMapBy[lang.Address, *sync.WaitGroup](lang.AddressToString[lang.Address]),
-		actions: concurrent.NewSlice[lang.Action](),
+		waiting: concurrent.NewMapBy[config.Address, *sync.WaitGroup](config.AddressToString[config.Address]),
+		actions: concurrent.NewSlice[config.Action](),
 	}
 }
 
 // Do task with id on a separate go routine after its dependencies are done. All dependencies MUST
 // have a previously registered task, otherwise the entire task coordinator
 // is stopped and an error is returned
-func (coordinator *Coordinator) Do(state *config.State, task lang.RawAddress, addresses []lang.RawAddress) ([]lang.Action, hcl.Diagnostics) {
+func (coordinator *Coordinator) Do(state *config.State, task config.RawAddress, addresses []config.RawAddress) ([]config.Action, hcl.Diagnostics) {
 	allDependencies, diags := topo.AllDependencies(task, addresses)
 	if diags.HasErrors() {
 		return nil, diags
 	}
 
-	taskDependencies := allDependencies[lang.AddressToString(task)]
+	taskDependencies := allDependencies[config.AddressToString(task)]
 	for _, address := range taskDependencies {
 		// get the dependencies of this task dependency
-		addressDependencies := allDependencies[lang.AddressToString(address)]
+		addressDependencies := allDependencies[config.AddressToString(address)]
 		// wait for all routines to finish so that we get all actions
 		// we need to remove the last element since it is the address itself
 		diags := coordinator.waitFor(addressDependencies[:len(addressDependencies)-1])
@@ -100,7 +99,7 @@ func (coordinator *Coordinator) Do(state *config.State, task lang.RawAddress, ad
 		evalContext := state.EvalContext()
 		evalContext.Variables = concurrent.Merge(
 			pathEvalContext(state, address),
-			lang.Actions(coordinator.actions.Items()).EvalContext(),
+			config.Actions(coordinator.actions.Items()).EvalContext(),
 		)
 		action, diags := address.Decode(evalContext)
 		if diags.HasErrors() {
@@ -121,14 +120,14 @@ func (coordinator *Coordinator) Do(state *config.State, task lang.RawAddress, ad
 	return coordinator.actions.Items(), nil
 }
 
-func (coordinator *Coordinator) waitFor(dependencies []lang.RawAddress) hcl.Diagnostics {
+func (coordinator *Coordinator) waitFor(dependencies []config.RawAddress) hcl.Diagnostics {
 	for _, dep := range dependencies {
 		group, ok := coordinator.waiting.Get(dep)
 		if !ok {
 			return hcl.Diagnostics{{
 				Severity: hcl.DiagError,
 				Summary: fmt.Sprintf("missing task %s",
-					lang.AddressToString(dep)),
+					config.AddressToString(dep)),
 			}}
 		}
 
@@ -142,7 +141,7 @@ func (coordinator *Coordinator) waitFor(dependencies []lang.RawAddress) hcl.Diag
 	return nil
 }
 
-func pathEvalContext(state *config.State, addr lang.Address) map[string]cty.Value {
+func pathEvalContext(state *config.State, addr config.Address) map[string]cty.Value {
 	cwd := state.CWD
 	return map[string]cty.Value{
 		"path": cty.ObjectVal(map[string]cty.Value{

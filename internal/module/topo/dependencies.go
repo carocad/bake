@@ -4,7 +4,7 @@ import (
 	"fmt"
 
 	"bake/internal/functional"
-	"bake/internal/lang"
+	"bake/internal/lang/config"
 	"bake/internal/lang/schema"
 	"bake/internal/paths"
 
@@ -20,20 +20,20 @@ const (
 )
 
 // AllDependencies returns a map of address string to addresses
-func AllDependencies(task lang.RawAddress, addresses []lang.RawAddress) (map[string][]lang.RawAddress, hcl.Diagnostics) {
+func AllDependencies(task config.RawAddress, addresses []config.RawAddress) (map[string][]config.RawAddress, hcl.Diagnostics) {
 	deps, diags := Dependencies(task, addresses)
 	if diags.HasErrors() {
 		return nil, diags
 	}
 
-	result := map[string][]lang.RawAddress{}
+	result := map[string][]config.RawAddress{}
 	for _, dep := range deps {
 		inner, diags := Dependencies(dep, addresses)
 		if diags.HasErrors() {
 			return nil, diags
 		}
 
-		result[lang.AddressToString(dep)] = inner
+		result[config.AddressToString(dep)] = inner
 	}
 
 	return result, nil
@@ -42,13 +42,13 @@ func AllDependencies(task lang.RawAddress, addresses []lang.RawAddress) (map[str
 // Dependencies sorting according to
 // https://www.wikiwand.com/en/Topological_sorting#/Depth-first_search
 // NOTE: the task itself is the last element of the dependency list
-func Dependencies(addr lang.RawAddress, addresses []lang.RawAddress) ([]lang.RawAddress, hcl.Diagnostics) {
-	mapping := map[string]lang.RawAddress{}
+func Dependencies(addr config.RawAddress, addresses []config.RawAddress) ([]config.RawAddress, hcl.Diagnostics) {
+	mapping := map[string]config.RawAddress{}
 	for _, address := range addresses {
-		mapping[lang.AddressToString(address)] = address
+		mapping[config.AddressToString(address)] = address
 	}
 
-	path := lang.AddressToString(addr)
+	path := config.AddressToString(addr)
 	markers := map[string]marker{
 		path: unmarked,
 	}
@@ -63,7 +63,7 @@ func Dependencies(addr lang.RawAddress, addresses []lang.RawAddress) ([]lang.Raw
 
 const cyclicalDependency = "cyclical dependency detected"
 
-func visit(current string, markers map[string]marker, addresses map[string]lang.RawAddress) ([]lang.RawAddress, hcl.Diagnostics) {
+func visit(current string, markers map[string]marker, addresses map[string]config.RawAddress) ([]config.RawAddress, hcl.Diagnostics) {
 	mark := markers[current]
 	if mark == permanent {
 		return nil, nil
@@ -78,7 +78,7 @@ func visit(current string, markers map[string]marker, addresses map[string]lang.
 	}
 
 	markers[current] = temporary
-	order := make([]lang.RawAddress, 0)
+	order := make([]config.RawAddress, 0)
 	dependencies, diagnostics := addresses[current].Dependencies()
 	if diagnostics.HasErrors() {
 		return nil, diagnostics
@@ -95,7 +95,7 @@ func visit(current string, markers map[string]marker, addresses map[string]lang.
 		}
 
 		// make sure we initialize the marker
-		path := lang.AddressToString(*innerID)
+		path := config.AddressToString(*innerID)
 		inner, diags := visit(path, markers, addresses)
 		if diags.HasErrors() {
 			for _, diag := range diags {
@@ -113,7 +113,7 @@ func visit(current string, markers map[string]marker, addresses map[string]lang.
 	return order, nil
 }
 
-func getByPrefix[T lang.Address](traversal hcl.Traversal, addresses map[string]T) (*T, hcl.Diagnostics) {
+func getByPrefix[T config.Address](traversal hcl.Traversal, addresses map[string]T) (*T, hcl.Diagnostics) {
 	path := paths.FromTraversal(traversal)
 	for _, address := range addresses {
 		if path.HasPrefix(address.GetPath()) {
@@ -121,7 +121,7 @@ func getByPrefix[T lang.Address](traversal hcl.Traversal, addresses map[string]T
 		}
 	}
 
-	options := functional.Map(functional.Values(addresses), lang.AddressToString[T])
+	options := functional.Map(functional.Values(addresses), config.AddressToString[T])
 	suggestion := functional.Suggest(paths.String(path), options)
 	summary := "unknown reference"
 	if suggestion != "" {
