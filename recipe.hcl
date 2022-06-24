@@ -57,9 +57,9 @@ package info
 import "time"
 
 const (
-  Version  = "${data.version.std_out}"
-  Revision = "${data.revision.std_out}"
-  Branch = "${data.branch.std_out}"
+  Version  = "${data.git["tag"].std_out}"
+  Revision = "${data.git["revision"].std_out}"
+  Branch = "${data.git["branch"].std_out}"
 )
 
 var CompiledAt = time.Now()

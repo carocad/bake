@@ -27,17 +27,17 @@ type TaskInstance struct {
 	Remain      hcl.Body          `hcl:",remain"`
 	exitCode    values.EventualInt64
 	path        cty.Path
-	metadata    *taskMetadata
+	metadata    taskMetadata
 }
 
-func newTaskInstance(path cty.Path, metadata *taskMetadata, body hcl.Body, ctx *hcl.EvalContext) (*TaskInstance, hcl.Diagnostics) {
+func newTaskInstance(path cty.Path, metadata taskMetadata, body hcl.Body, ctx *hcl.EvalContext) (*TaskInstance, hcl.Diagnostics) {
 	task := &TaskInstance{path: path, metadata: metadata}
 	diags := gohcl.DecodeBody(body, ctx, task)
 	if diags.HasErrors() {
 		return nil, diags
 	}
 
-	diags = verifyAttributes(task.Remain)
+	diags = schema.ValidateAttributes(task.Remain)
 	if diags.HasErrors() {
 		return nil, diags
 	}
@@ -133,34 +133,6 @@ func (t *TaskInstance) Apply(state *config.State) hcl.Diagnostics {
 			Detail:   err.Error(),
 			Subject:  &t.metadata.Creates,
 			Context:  &t.metadata.Block,
-		}}
-	}
-
-	return nil
-}
-
-func verifyAttributes(body hcl.Body) hcl.Diagnostics {
-	attrs, diags := body.JustAttributes()
-	if diags.HasErrors() {
-		return diags
-	}
-
-	for _, attr := range attrs {
-		if attr.Name == schema.DependsOnAttr {
-			_, diags := schema.TupleOfReferences(attrs[schema.DependsOnAttr])
-			return diags
-		}
-
-		if attr.Name == schema.ForEachAttr {
-			continue
-		}
-
-		// only depends on is allowed
-		return hcl.Diagnostics{{
-			Severity: hcl.DiagError,
-			Summary:  "Unsupported argument",
-			Detail:   fmt.Sprintf(`An argument named "%s" is not expected here`, attr.Name),
-			Subject:  attr.Expr.Range().Ptr(),
 		}}
 	}
 

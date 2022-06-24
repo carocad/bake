@@ -9,6 +9,7 @@ require (
 	github.com/mitchellh/colorstring v0.0.0-20190213212951-d06e56a500db
 	github.com/urfave/cli v1.22.9
 	github.com/zclconf/go-cty v1.8.0
+	golang.org/x/exp v0.0.0-20220613132600-b0d781184e0d
 	golang.org/x/sync v0.0.0-20220513210516-0976fa681c29
 )
 
@@ -18,6 +19,5 @@ require (
 	github.com/google/go-cmp v0.5.8 // indirect
 	github.com/mitchellh/go-wordwrap v0.0.0-20150314170334-ad45545899c7 // indirect
 	github.com/russross/blackfriday/v2 v2.1.0 // indirect
-	golang.org/x/exp v0.0.0-20220613132600-b0d781184e0d // indirect
 	golang.org/x/text v0.3.7 // indirect
 )

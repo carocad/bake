@@ -1,18 +1,14 @@
 package lang
 
 import (
-	"fmt"
 	"sync"
 
-	"bake/internal/concurrent"
 	"bake/internal/lang/config"
 	"bake/internal/lang/meta"
 	"bake/internal/lang/schema"
 
 	"github.com/hashicorp/hcl/v2"
 	"github.com/zclconf/go-cty/cty"
-	"github.com/zclconf/go-cty/cty/convert"
-	"github.com/zclconf/go-cty/cty/gocty"
 	"golang.org/x/exp/maps"
 )
 
@@ -32,7 +28,6 @@ type taskMetadata struct {
 	Command   hcl.Range
 	Creates   hcl.Range
 	Sources   hcl.Range
-	Remain    hcl.Range
 	DependsOn hcl.Range
 }
 
@@ -44,19 +39,20 @@ func newTask(raw addressBlock, eval *hcl.EvalContext) (Action, hcl.Diagnostics) 
 		return nil, diags
 	}
 
-	forEachEntries, diags := getForEachEntries(raw, eval)
+	forEachEntries, diags := schema.ForEachEntries(raw.Block, eval)
 	if diags.HasErrors() {
 		return nil, diags
 	}
 
-	if forEachEntries == nil {
-		task, diags := newTaskInstance(path, &metadata, raw.Block.Body, eval)
+	if len(forEachEntries) == 0 {
+		task, diags := newTaskInstance(path, metadata, raw.Block.Body, eval)
 		if diags.HasErrors() {
 			return nil, diags
 		}
 
 		return &Task{
 			path:           path,
+			metadata:       metadata,
 			singleInstance: task,
 		}, nil
 	}
@@ -64,7 +60,7 @@ func newTask(raw addressBlock, eval *hcl.EvalContext) (Action, hcl.Diagnostics) 
 	instances := map[string]*TaskInstance{}
 	for key, value := range forEachEntries {
 		ctx := eachContext(key, value, eval.NewChild())
-		task, diags := newTaskInstance(path.IndexString(key), &metadata, raw.Block.Body, ctx)
+		task, diags := newTaskInstance(path.IndexString(key), metadata, raw.Block.Body, ctx)
 		if diags.HasErrors() {
 			return nil, diags
 		}
@@ -74,62 +70,9 @@ func newTask(raw addressBlock, eval *hcl.EvalContext) (Action, hcl.Diagnostics) 
 
 	return &Task{
 		path:           path,
+		metadata:       metadata,
 		namedInstances: instances,
 	}, nil
-}
-
-func getForEachEntries(raw addressBlock, ctx *hcl.EvalContext) (map[string]string, hcl.Diagnostics) {
-	attributes, diags := raw.Block.Body.JustAttributes()
-	if diags.HasErrors() {
-		return nil, diags
-	}
-
-	for name, attr := range attributes {
-		if name == schema.ForEachAttr {
-			value, diags := attr.Expr.Value(ctx)
-			if diags.HasErrors() {
-				return nil, diags
-			}
-
-			forEachSet := make([]string, 0)
-			err := gocty.FromCtyValue(value, &forEachSet)
-			if err == nil {
-				return concurrent.SetToMap(forEachSet), nil
-			}
-
-			diagnostic := hcl.Diagnostics{{
-				Severity: hcl.DiagError,
-				Summary: fmt.Sprintf(
-					`"for_each" field must be either a set or a map of strings but "%s" was provided`,
-					value.Type().FriendlyNameForConstraint(),
-				),
-				Detail:      err.Error(),
-				Subject:     attr.Expr.Range().Ptr(),
-				Context:     &raw.Block.DefRange,
-				Expression:  attr.Expr,
-				EvalContext: ctx,
-			}}
-			forEachMap := make(map[string]string)
-			// somehow FromCtyValue doesnt do this convertion itself :/
-			if value.Type().IsObjectType() {
-				v2, err := convert.Convert(value, cty.Map(cty.String))
-				if err != nil {
-					return nil, diagnostic
-				}
-
-				value = v2
-			}
-
-			err = gocty.FromCtyValue(value, &forEachMap)
-			if err != nil {
-				return nil, diagnostic
-			}
-
-			return forEachMap, nil
-		}
-	}
-
-	return nil, nil
 }
 
 func eachContext(key, value string, context *hcl.EvalContext) *hcl.EvalContext {
