@@ -95,7 +95,7 @@ func visit(current string, markers map[string]marker, addresses map[string]confi
 		}
 
 		// make sure we initialize the marker
-		path := config.AddressToString(*innerID)
+		path := config.AddressToString(innerID)
 		inner, diags := visit(path, markers, addresses)
 		if diags.HasErrors() {
 			for _, diag := range diags {
@@ -113,11 +113,11 @@ func visit(current string, markers map[string]marker, addresses map[string]confi
 	return order, nil
 }
 
-func getByPrefix[T config.Address](traversal hcl.Traversal, addresses map[string]T) (*T, hcl.Diagnostics) {
+func getByPrefix(traversal hcl.Traversal, addresses map[string]config.RawAddress) (config.RawAddress, hcl.Diagnostics) {
 	path := paths.FromTraversal(traversal)
 	for _, address := range addresses {
 		if path.HasPrefix(address.GetPath()) {
-			return &address, nil
+			return address, nil
 		}
 	}
 
