@@ -9,6 +9,7 @@ import (
 	"bake/internal/paths"
 
 	"github.com/hashicorp/hcl/v2"
+	"golang.org/x/exp/maps"
 )
 
 type marker int
@@ -121,7 +122,7 @@ func getByPrefix(traversal hcl.Traversal, addresses map[string]config.RawAddress
 		}
 	}
 
-	options := functional.Map(functional.Values(addresses), config.AddressToString[T])
+	options := functional.Map(maps.Values(addresses), config.AddressToString[config.RawAddress])
 	suggestion := functional.Suggest(paths.String(path), options)
 	summary := "unknown reference"
 	if suggestion != "" {

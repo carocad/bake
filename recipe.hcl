@@ -19,7 +19,21 @@ locals {
 task "main" {
   description = "the default task to run"
 
-  depends_on = [vet, compile, test]
+  // WARNING: never run 'main' from cmd/main.test as that would create
+  // an infinite loop
+  depends_on = [build, integration_test]
+}
+
+/**
+ This is just a convenience definition to allow cmd/main.test to
+ execute as much as possible of the build process without it creating
+ an infinite loop; as it would happen by calling "main"
+ main -> integration_test -> main -> integration_test ....
+*/
+task "build" {
+  description = "same as main but without integration tests"
+
+  depends_on = [vet, compile, unit_test]
 }
 
 task "compile" {
@@ -38,12 +52,21 @@ task "vet" {
   sources  = [local.go_sources]
 }
 
-task "test" {
+task "unit_test" {
   command = "go test -timeout 10s ./... | tee ${local.test_report}"
   creates = local.test_report
   sources  = [local.go_sources]
 
-  depends_on = [libraries]
+  depends_on = [compile]
+}
+
+task "integration_test" {
+  command = <<CMD
+  go test -tags integration_test -coverpkg ./... -c -o ./cmd/main.test ./cmd
+  ./cmd/main.test -test.coverprofile cmd/main.test.txt
+  CMD
+
+  depends_on = [compile]
 }
 
 task "version" {
