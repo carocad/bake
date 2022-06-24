@@ -7,6 +7,7 @@ import (
 	"context"
 	"fmt"
 	"math"
+	"sync"
 	"testing"
 	"time"
 
@@ -14,7 +15,7 @@ import (
 	"github.com/zclconf/go-cty/cty"
 )
 
-const tolerance = 0.1
+const tolerance = 0.01
 
 type fakeAddress struct {
 	name string
@@ -42,15 +43,15 @@ func (s fakeAddress) Dependencies() ([]hcl.Traversal, hcl.Diagnostics) {
 	return result, nil
 }
 
-func (s fakeAddress) Decode(ctx *hcl.EvalContext) ([]lang.Action, hcl.Diagnostics) {
-	return []lang.Action{s}, nil
+func (s fakeAddress) Decode(ctx *hcl.EvalContext) (lang.Action, hcl.Diagnostics) {
+	return s, nil
 }
 
 func (s fakeAddress) CTY() cty.Value {
 	return cty.StringVal(s.name)
 }
 
-func (s fakeAddress) Hash() *config.Hash {
+func (s fakeAddress) Hash() []config.Hash {
 	return nil
 }
 
@@ -58,9 +59,17 @@ func (s fakeAddress) Plan(state config.State) (bool, string, hcl.Diagnostics) {
 	return true, fmt.Sprintf(`refreshing "%s"`, lang.AddressToString(s)), nil
 }
 
-func (s fakeAddress) Apply(ctx context.Context, state *config.State) hcl.Diagnostics {
-	time.Sleep(200 * time.Millisecond)
-	return nil
+func (s fakeAddress) Apply(state *config.State) *sync.WaitGroup {
+	wait := &sync.WaitGroup{}
+	wait.Add(1)
+	state.Group.Go(func() error {
+		defer wait.Done()
+		time.Sleep(200 * time.Millisecond)
+
+		return nil
+	})
+
+	return wait
 }
 
 func TestSerialCoordination(t *testing.T) {
@@ -71,12 +80,12 @@ func TestSerialCoordination(t *testing.T) {
 		data = append(data, fakeAddress{value, preData[:index]})
 	}
 
-	state, err := config.NewState()
+	state, err := config.NewState(context.Background())
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	coordinator := NewCoordinator(context.TODO(), int(state.Parallelism))
+	coordinator := NewCoordinator()
 	start := time.Now()
 	actions, diags := coordinator.Do(state, data[len(data)-1], data)
 	if diags.HasErrors() {
@@ -106,12 +115,12 @@ func TestParallelCoordination(t *testing.T) {
 		data = append(data, fakeAddress{value, nil})
 	}
 
-	state, err := config.NewState()
+	state, err := config.NewState(context.Background())
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	coordinator := NewCoordinator(context.TODO(), int(state.Parallelism))
+	coordinator := NewCoordinator()
 	start := time.Now()
 	_, diags := coordinator.Do(state, data[len(data)-1], data)
 	if diags.HasErrors() {
@@ -140,12 +149,12 @@ func TestCustomCoordination(t *testing.T) {
 	}}
 
 	addresses := functional.Map(data, func(f fakeAddress) lang.RawAddress { return f })
-	state, err := config.NewState()
+	state, err := config.NewState(context.Background())
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	coordinator := NewCoordinator(context.TODO(), int(state.Parallelism))
+	coordinator := NewCoordinator()
 	start := time.Now()
 	actions, diags := coordinator.Do(state, data[len(data)-1], addresses)
 	if diags.HasErrors() {

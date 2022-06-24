@@ -1,8 +1,10 @@
 package lang
 
 import (
+	"bake/internal/lang/config"
 	"bake/internal/lang/schema"
 	"fmt"
+	"sync"
 
 	"github.com/hashicorp/hcl/v2"
 	"github.com/zclconf/go-cty/cty"
@@ -78,16 +80,13 @@ func (n addressBlock) GetFilename() string {
 	return n.Block.DefRange.Filename
 }
 
-func (n addressBlock) GetName() string {
-	return n.Block.Labels[0]
-}
-
 func (n addressBlock) GetPath() cty.Path {
+	name := n.Block.Labels[0]
 	if n.Block.Type == schema.TaskLabel {
-		return cty.GetAttrPath(n.GetName())
+		return cty.GetAttrPath(name)
 	}
 
-	return cty.GetAttrPath(n.Block.Type).GetAttr(n.GetName())
+	return cty.GetAttrPath(n.Block.Type).GetAttr(name)
 }
 
 func (n addressBlock) Dependencies() ([]hcl.Traversal, hcl.Diagnostics) {
@@ -104,10 +103,10 @@ func (n addressBlock) Dependencies() ([]hcl.Traversal, hcl.Diagnostics) {
 	return deps, nil
 }
 
-func (addr addressBlock) Decode(ctx *hcl.EvalContext) ([]Action, hcl.Diagnostics) {
+func (addr addressBlock) Decode(ctx *hcl.EvalContext) (Action, hcl.Diagnostics) {
 	switch addr.Block.Type {
 	case schema.TaskLabel:
-		tasks, diagnostics := newTasks(addr, ctx)
+		tasks, diagnostics := newTask(addr, ctx)
 		if diagnostics.HasErrors() {
 			return nil, diagnostics
 		}
@@ -119,8 +118,45 @@ func (addr addressBlock) Decode(ctx *hcl.EvalContext) ([]Action, hcl.Diagnostics
 			return nil, diagnostics
 		}
 
-		return []Action{data}, nil
+		return data, nil
 	default:
 		panic("missing label implementation " + addr.Block.Type)
 	}
+}
+
+func applyIndexed[T RuntimeInstance](instances []T, state *config.State) *sync.WaitGroup {
+	wait := &sync.WaitGroup{}
+	for _, app := range instances {
+		app := app
+		wait.Add(1)
+		state.Group.Go(func() error {
+			defer wait.Done()
+
+			diags := app.Apply(state)
+			if diags.HasErrors() {
+				return diags
+			}
+
+			return nil
+		})
+	}
+
+	return wait
+}
+
+func applySingle(instance RuntimeInstance, state *config.State) *sync.WaitGroup {
+	wait := &sync.WaitGroup{}
+	wait.Add(1)
+	state.Group.Go(func() error {
+		defer wait.Done()
+
+		diags := instance.Apply(state)
+		if diags.HasErrors() {
+			return diags
+		}
+
+		return nil
+	})
+
+	return wait
 }

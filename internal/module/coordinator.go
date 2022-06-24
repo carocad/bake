@@ -5,14 +5,12 @@ import (
 	"bake/internal/lang"
 	"bake/internal/lang/config"
 	"bake/internal/module/topo"
-	"context"
 	"fmt"
 	"path/filepath"
 	"sync"
 
 	"github.com/hashicorp/hcl/v2"
 	"github.com/zclconf/go-cty/cty"
-	"golang.org/x/sync/errgroup"
 )
 
 // example from make target --dry-run --debug
@@ -68,22 +66,14 @@ Successfully remade target file 'dev'.
 
 // Coordinator executes tasks in parallel respecting the dependencies between each task
 type Coordinator struct {
-	// use a bounded go routine pool for the execution of task commands
-	pool    *errgroup.Group
 	waiting *concurrent.Map[lang.Address, *sync.WaitGroup]
 	actions *concurrent.Slice[lang.Action]
-	ctx     context.Context
 }
 
-func NewCoordinator(ctx context.Context, parallelism int) Coordinator {
-	// todo: do I need to return the context?
-	bounded, ctx := errgroup.WithContext(ctx)
-	bounded.SetLimit(parallelism)
+func NewCoordinator() Coordinator {
 	return Coordinator{
-		pool:    bounded,
 		waiting: concurrent.NewMapBy[lang.Address, *sync.WaitGroup](lang.AddressToString[lang.Address]),
 		actions: concurrent.NewSlice[lang.Action](),
-		ctx:     ctx,
 	}
 }
 
@@ -98,10 +88,6 @@ func (coordinator *Coordinator) Do(state *config.State, task lang.RawAddress, ad
 
 	taskDependencies := allDependencies[lang.AddressToString(task)]
 	for _, address := range taskDependencies {
-		// initialize this dependency wait group so that other goroutines can wait for it
-		promise := &sync.WaitGroup{}
-		coordinator.waiting.Put(address, promise)
-
 		// get the dependencies of this task dependency
 		addressDependencies := allDependencies[lang.AddressToString(address)]
 		// wait for all routines to finish so that we get all actions
@@ -113,37 +99,21 @@ func (coordinator *Coordinator) Do(state *config.State, task lang.RawAddress, ad
 
 		evalContext := state.EvalContext()
 		evalContext.Variables = concurrent.Merge(
-			pathContext(state, address),
-			lang.Actions(coordinator.actions.Items()).Context(),
+			pathEvalContext(state, address),
+			lang.Actions(coordinator.actions.Items()).EvalContext(),
 		)
-		actions, diags := address.Decode(evalContext)
+		action, diags := address.Decode(evalContext)
 		if diags.HasErrors() {
 			return nil, diags
 		}
 
-		coordinator.actions.Extend(actions)
-		for _, action := range actions {
-			promise.Add(1)
-			// keep a reference to the original value due to closure and goroutine
-			// https://golang.org/doc/faq#closures_and_goroutines
-			action := action
-			// use the bounded routine pool to avoid overloading the OS with possibly
-			// CPU heavy tasks
-			coordinator.pool.Go(func() error {
-				defer promise.Done()
-
-				diags := action.Apply(coordinator.ctx, state)
-				// todo: display the time it took to apply the action
-				if diags.HasErrors() {
-					return diags
-				}
-
-				return nil
-			})
-		}
+		wait := action.Apply(state)
+		// initialize this dependency wait group so that other goroutines can wait for it
+		coordinator.waiting.Put(address, wait)
+		coordinator.actions.Append(action)
 	}
 
-	err := coordinator.pool.Wait()
+	err := state.Group.Wait()
 	if diags, ok := err.(hcl.Diagnostics); ok {
 		return nil, diags
 	}
@@ -153,7 +123,7 @@ func (coordinator *Coordinator) Do(state *config.State, task lang.RawAddress, ad
 
 func (coordinator *Coordinator) waitFor(dependencies []lang.RawAddress) hcl.Diagnostics {
 	for _, dep := range dependencies {
-		waiter, ok := coordinator.waiting.Get(dep)
+		group, ok := coordinator.waiting.Get(dep)
 		if !ok {
 			return hcl.Diagnostics{{
 				Severity: hcl.DiagError,
@@ -162,13 +132,17 @@ func (coordinator *Coordinator) waitFor(dependencies []lang.RawAddress) hcl.Diag
 			}}
 		}
 
-		waiter.Wait()
+		if group == nil {
+			continue
+		}
+
+		group.Wait()
 	}
 
 	return nil
 }
 
-func pathContext(state *config.State, addr lang.Address) map[string]cty.Value {
+func pathEvalContext(state *config.State, addr lang.Address) map[string]cty.Value {
 	cwd := state.CWD
 	return map[string]cty.Value{
 		"path": cty.ObjectVal(map[string]cty.Value{

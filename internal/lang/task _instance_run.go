@@ -12,17 +12,18 @@ import (
 
 	"bake/internal/lang/config"
 	"bake/internal/lang/values"
+	"bake/internal/paths"
 
 	"github.com/bmatcuk/doublestar/v4"
 	"github.com/hashicorp/hcl/v2"
 )
 
-func (t Task) dryRun(state *config.State) (shouldApply bool, reason string, diags hcl.Diagnostics) {
+func (t TaskInstance) dryRun(state *config.State) (shouldApply bool, reason string, diags hcl.Diagnostics) {
 	if state.Flags.Force {
 		return true, "force run is in effect", nil
 	}
 
-	oldHash, ok := state.Lock.Tasks[AddressToString(t)]
+	oldHash, ok := state.Lock.Get(t.path)
 	if ok {
 		hash := t.Hash()
 		if hash.Creates != oldHash.Creates {
@@ -94,7 +95,7 @@ func (t Task) dryRun(state *config.State) (shouldApply bool, reason string, diag
 	return false, fmt.Sprintf(`"%s" is newer than "%s" ... skipping`, t.Creates, strings.Join(t.Sources, "")), nil
 }
 
-func (t *Task) run(ctx context.Context, log *log.Logger) hcl.Diagnostics {
+func (t *TaskInstance) run(ctx context.Context, log *log.Logger) hcl.Diagnostics {
 	// determine which shell to use
 	terminal := "bash"
 	shell, ok := os.LookupEnv("SHELL")
@@ -134,7 +135,7 @@ func (t *Task) run(ctx context.Context, log *log.Logger) hcl.Diagnostics {
 	if err != nil {
 		return hcl.Diagnostics{{
 			Severity: hcl.DiagError,
-			Summary:  fmt.Sprintf(`"%s" task failed with "%s"`, AddressToString(t), command.ProcessState.String()),
+			Summary:  fmt.Sprintf(`"%s" task failed with "%s"`, paths.String(t.path), command.ProcessState.String()),
 			Detail:   detail,
 			Subject:  &t.metadata.Command,
 			Context:  &t.metadata.Block,
@@ -149,7 +150,7 @@ func (t *Task) run(ctx context.Context, log *log.Logger) hcl.Diagnostics {
 	if err != nil {
 		return hcl.Diagnostics{{
 			Severity: hcl.DiagError,
-			Summary:  fmt.Sprintf(`"%s" didn't create the expected file "%s"`, AddressToString(t), t.Creates),
+			Summary:  fmt.Sprintf(`"%s" didn't create the expected file "%s"`, paths.String(t.path), t.Creates),
 			Subject:  &t.metadata.Creates,
 			Context:  &t.metadata.Block,
 		}}

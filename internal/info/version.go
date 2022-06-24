@@ -4,9 +4,9 @@ package info
 import "time"
 
 const (
-  Version  = "v0.1.0"
-  Revision = "5e9e632"
-  Branch = "main"
+	Version  = "v0.1.0"
+	Revision = "8fd2b8b"
+	Branch   = "for_each"
 )
 
 var CompiledAt = time.Now()

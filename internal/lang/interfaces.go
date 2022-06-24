@@ -6,9 +6,9 @@ import (
 	"bake/internal/lang/schema"
 	"bake/internal/lang/values"
 	"bake/internal/paths"
-	"context"
 	"log"
 	"os"
+	"sync"
 
 	"github.com/hashicorp/hcl/v2"
 	"github.com/hashicorp/hcl/v2/gohcl"
@@ -18,7 +18,6 @@ import (
 )
 
 type Address interface {
-	GetName() string
 	GetPath() cty.Path
 	GetFilename() string
 }
@@ -26,14 +25,22 @@ type Address interface {
 type Action interface {
 	Address
 	values.Cty
-	Apply(context.Context, *config.State) hcl.Diagnostics
-	Hash() *config.Hash
+	RuntimeAction
+	config.Hasher
+}
+
+type RuntimeAction interface {
+	Apply(*config.State) *sync.WaitGroup
+}
+
+type RuntimeInstance interface {
+	Apply(*config.State) hcl.Diagnostics
 }
 
 type RawAddress interface {
 	Address
 	Dependencies() ([]hcl.Traversal, hcl.Diagnostics)
-	Decode(ctx *hcl.EvalContext) ([]Action, hcl.Diagnostics)
+	Decode(ctx *hcl.EvalContext) (Action, hcl.Diagnostics)
 }
 
 func AddressToString[T Address](addr T) string {
@@ -77,15 +84,15 @@ func GetPublicTasks(addrs []RawAddress) []CliCommand {
 	return commands
 }
 
-func NewLogger(addr Address) *log.Logger {
-	prefix := colorstring.Color("[bold]" + AddressToString(addr))
+func NewLogger(path cty.Path) *log.Logger {
+	prefix := colorstring.Color("[bold]" + paths.String(path))
 	// todo: change stdout according to state
 	return log.New(os.Stdout, prefix+": ", 0)
 }
 
 type Actions []Action
 
-func (actions Actions) Context() map[string]cty.Value {
+func (actions Actions) EvalContext() map[string]cty.Value {
 	variables := map[string]cty.Value{}
 	data := map[string]cty.Value{}
 	local := map[string]cty.Value{}
