@@ -119,7 +119,12 @@ func (addr addressBlock) Decode(ctx *hcl.EvalContext) (config.Action, hcl.Diagno
 
 		return data, nil
 	default:
-		panic("missing label implementation " + addr.Block.Type)
+		return nil, hcl.Diagnostics{{
+			Severity:    hcl.DiagError,
+			Summary:     fmt.Sprintf(`missing label implementation: "%s"`, addr.Block.Type),
+			Subject:     &addr.Block.DefRange,
+			EvalContext: ctx,
+		}}
 	}
 }
 

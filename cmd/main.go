@@ -8,6 +8,8 @@ import (
 	"fmt"
 	"os"
 	"os/signal"
+	"runtime/debug"
+	"sync"
 	"time"
 
 	"github.com/hashicorp/hcl/v2"
@@ -16,6 +18,8 @@ import (
 )
 
 func main() {
+	defer panicHandler()
+
 	// setup signal handler
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt)
 	defer stop()
@@ -125,3 +129,49 @@ var (
 		Usage: "Force the current task to run even if nothing changed",
 	}
 )
+
+const panicOutput = `
+!!!!!!!!!!!!!!!!!!!!!!!!!!! BAKE CRASH !!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+Bake crashed! This is always indicative of a bug within Bake.
+Please report the crash with Bake[1] so that we can fix this.
+
+When reporting bugs, please include your bake version, the stack trace
+shown below, and any additional information which may help replicate the issue.
+
+[1]: https://github.com/carocad/bake/issues
+
+!!!!!!!!!!!!!!!!!!!!!!!!!!! BAKE CRASH !!!!!!!!!!!!!!!!!!!!!!!!!!!!
+`
+
+// In case multiple goroutines panic concurrently, ensure only the first one
+// recovered by PanicHandler starts printing.
+var panicMutex sync.Mutex
+
+// panicHandler is called to recover from an internal panic in bake, and
+// augments the standard stack trace with a more user friendly error message.
+// panicHandler must be called as a defered function, and must be the first
+// defer called at the start of a new goroutine.
+func panicHandler() {
+	// Have all managed goroutines checkin here, and prevent them from exiting
+	// if there's a panic in progress. While this can't lock the entire runtime
+	// to block progress, we can prevent some cases where bake may return
+	// early before the panic has been printed out.
+	panicMutex.Lock()
+	defer panicMutex.Unlock()
+
+	recovered := recover()
+	if recovered == nil {
+		return
+	}
+
+	fmt.Fprint(os.Stderr, panicOutput)
+	fmt.Fprint(os.Stderr, recovered, "\n")
+
+	debug.PrintStack()
+
+	// An exit code of 11 keeps us out of the way of the detailed exitcodes
+	// from plan, and also happens to be the same code as SIGSEGV which is
+	// roughly the same type of condition that causes most panics.
+	os.Exit(11)
+}
