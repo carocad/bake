@@ -3,10 +3,10 @@ package topo
 import (
 	"fmt"
 
-	"bake/internal/functional"
 	"bake/internal/lang/config"
 	"bake/internal/lang/schema"
 	"bake/internal/paths"
+	"bake/internal/util"
 
 	"github.com/hashicorp/hcl/v2"
 	"golang.org/x/exp/maps"
@@ -122,8 +122,8 @@ func getByPrefix(traversal hcl.Traversal, addresses map[string]config.RawAddress
 		}
 	}
 
-	options := functional.Map(maps.Values(addresses), config.AddressToString[config.RawAddress])
-	suggestion := functional.Suggest(paths.String(path), options)
+	options := util.Map(maps.Values(addresses), config.AddressToString[config.RawAddress])
+	suggestion := util.Suggest(paths.String(path), options)
 	summary := "unknown reference"
 	if suggestion != "" {
 		summary += fmt.Sprintf(`. Did you mean "%s"?`, suggestion)

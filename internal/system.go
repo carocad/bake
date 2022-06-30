@@ -5,11 +5,11 @@ import (
 	"io/ioutil"
 	"path/filepath"
 
-	"bake/internal/functional"
 	"bake/internal/lang"
 	"bake/internal/lang/config"
 	"bake/internal/lang/schema"
 	"bake/internal/module"
+	"bake/internal/util"
 
 	"github.com/hashicorp/hcl/v2"
 	"github.com/hashicorp/hcl/v2/hclparse"
@@ -91,8 +91,8 @@ func getTask(name string, addresses []config.RawAddress) (config.RawAddress, hcl
 		return address, nil
 	}
 
-	options := functional.Map(addresses, config.AddressToString[config.RawAddress])
-	suggestion := functional.Suggest(name, options)
+	options := util.Map(addresses, config.AddressToString[config.RawAddress])
+	suggestion := util.Suggest(name, options)
 	summary := "couldn't find any target with name " + name
 	if suggestion != "" {
 		summary += fmt.Sprintf(`. Did you mean "%s"`, suggestion)

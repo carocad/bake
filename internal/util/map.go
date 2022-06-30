@@ -1,4 +1,4 @@
-package functional
+package util
 
 import (
 	"github.com/agext/levenshtein"
@@ -9,15 +9,6 @@ func Map[T any, U any](slice []T, f func(T) U) []U {
 	for i, t := range slice {
 		result[i] = f(t)
 	}
-	return result
-}
-
-func Values[T any, U comparable](m map[U]T) []T {
-	result := make([]T, 0)
-	for _, t := range m {
-		result = append(result, t)
-	}
-
 	return result
 }
 

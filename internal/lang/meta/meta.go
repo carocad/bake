@@ -1,7 +1,7 @@
 package meta
 
 import (
-	"bake/internal/concurrent"
+	"bake/internal/util"
 	"fmt"
 	"reflect"
 
@@ -42,7 +42,7 @@ func decodeBodyToStruct(body hcl.Body, ctx *hcl.EvalContext, val reflect.Value) 
 	for index := 0; index < val.NumField(); index++ {
 		field := val.Type().Field(index)
 		fieldValue := val.Field(index)
-		attr, ok := attrs[concurrent.ToSnakeCase(field.Name)]
+		attr, ok := attrs[util.ToSnakeCase(field.Name)]
 		if !ok {
 			continue
 		}

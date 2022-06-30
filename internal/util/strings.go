@@ -1,4 +1,4 @@
-package concurrent
+package util
 
 import (
 	"regexp"

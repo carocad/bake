@@ -1,7 +1,7 @@
 package values
 
 import (
-	"bake/internal/concurrent"
+	"bake/internal/util"
 	"fmt"
 	"reflect"
 
@@ -28,7 +28,7 @@ func StructToCty(instance interface{}) cty.Value {
 		}
 
 		fieldInterface := fieldValue.Interface()
-		name := concurrent.ToSnakeCase(field.Name)
+		name := util.ToSnakeCase(field.Name)
 		if v, ok := fieldInterface.(Cty); ok {
 			result[name] = v.CTY()
 			continue

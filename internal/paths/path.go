@@ -57,16 +57,3 @@ func StepString(step cty.PathStep) string {
 	// maybe go-cty added a new step type?
 	panic("key value not number or string")
 }
-
-func Type(step cty.PathStep) cty.Type {
-	if _, ok := step.(cty.GetAttrStep); ok {
-		return cty.String
-	}
-
-	if attr, ok := step.(cty.IndexStep); ok {
-		return attr.Key.Type()
-	}
-
-	// maybe go-cty added a new step type?
-	panic(fmt.Sprintf("unknown step: %#v", step))
-}

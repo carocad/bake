@@ -1,8 +1,8 @@
 package module
 
 import (
-	"bake/internal/functional"
 	"bake/internal/lang/config"
+	"bake/internal/util"
 	"context"
 	"fmt"
 	"math"
@@ -147,7 +147,7 @@ func TestCustomCoordination(t *testing.T) {
 		"5", []string{"4"}, // duration = 0.2 + 0.6 = 0.8
 	}}
 
-	addresses := functional.Map(data, func(f fakeAddress) config.RawAddress { return f })
+	addresses := util.Map(data, func(f fakeAddress) config.RawAddress { return f })
 	state, err := config.NewState(context.Background())
 	if err != nil {
 		t.Fatal(err)
