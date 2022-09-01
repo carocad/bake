@@ -21,7 +21,7 @@ task "main" {
 
   // WARNING: never run 'main' from cmd/main.test as that would create
   // an infinite loop
-  depends_on = [vet, compile, unit_test]
+  depends_on = [vet, unit_test]
 }
 
 task "compile" {

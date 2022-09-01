@@ -1,0 +1,28 @@
+
+# avoids building a PR twice, once for a branch and another due to the PR status
+# see: https://github.com/travis-ci/travis-ci/issues/1147#issuecomment-160820262
+branches:
+  only:
+    - master
+    - /^v\d+\.\d+(\.\d+)?(-\S*)?$/
+
+language: go  
+
+go: "1.18"
+
+jobs:
+  include:
+    - stage: tests
+      script:
+        - ./scripts/bootstrap.sh run main --dry
+        - ./scripts/bootstrap.sh run main
+    - stage: Release
+      if: tag IS present
+      script: # TODO
+        - ./scripts/bootstrap.sh run main
+      deploy:
+        - provider: script
+          script: ./scripts/bootstrap.sh run main # TODO
+          skip_cleanup: true
+          on:
+            tags: true
