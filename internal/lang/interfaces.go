@@ -14,7 +14,7 @@ import (
 
 type CliCommand struct{ Name, Description string }
 
-func GetPublicTasks(addrs []config.RawAddress) []CliCommand {
+func FilterPublicTasks(addrs []config.RawAddress) []CliCommand {
 	commands := make([]CliCommand, 0)
 	for _, addr := range addrs {
 		if schema.IsKnownPrefix(addr.GetPath()) {

@@ -3,7 +3,6 @@ package main
 import (
 	"bake/internal"
 	"bake/internal/info"
-	"bake/internal/lang"
 	"bake/internal/lang/config"
 	"context"
 	"fmt"
@@ -48,6 +47,12 @@ func do(ctx context.Context) (hcl.DiagnosticWriter, error) {
 	parser := hclparse.NewParser()
 	// logger for diagnostics
 	log := hcl.NewDiagnosticTextWriter(os.Stdout, parser.Files(), 78, true)
+	// keep track of flags and other config related vars
+	state, err := config.NewState(ctx)
+	if err != nil {
+		return nil, err
+	}
+
 	app := &cli.App{
 		Name:     "bake",
 		Usage:    `Build task orchestration`,
@@ -57,19 +62,13 @@ func do(ctx context.Context) (hcl.DiagnosticWriter, error) {
 			Name:  "list",
 			Usage: "lists all public tasks; those that have a description",
 			Action: func(c *cli.Context) error {
-				// keep track of flags and other config related vars
-				state, err := config.NewState(ctx)
+				// read bake files in the cwd
+				tasks, err := internal.GetPublicTasks(state, parser)
 				if err != nil {
 					return err
 				}
 
-				// read bake files in the cwd
-				addrs, diags := internal.ReadRecipes(state.CWD, parser)
-				if diags.HasErrors() {
-					return diags
-				}
-
-				tasks := lang.GetPublicTasks(addrs)
+				// TODO: pretty print list
 				for _, task := range tasks {
 					fmt.Printf("%s\t%s", task.Name, task.Description)
 				}
@@ -89,25 +88,13 @@ func do(ctx context.Context) (hcl.DiagnosticWriter, error) {
 					return cli.ShowCommandHelp(c, c.Command.Name)
 				}
 
-				// keep track of flags and other config related vars
-				state, err := config.NewState(ctx)
-				if err != nil {
-					return err
-				}
-
-				// read bake files in the cwd
-				addrs, diags := internal.ReadRecipes(state.CWD, parser)
-				if diags.HasErrors() {
-					return diags
-				}
-
 				state.Flags, err = config.NewStateFlags(c.Bool(Dry), c.Bool(Prune), c.Bool(Force))
 				if err != nil {
 					return err
 				}
 
 				start := time.Now()
-				diags = internal.Do(task, state, addrs)
+				diags := internal.Do(task, state, parser)
 				end := time.Now()
 				fmt.Printf("\ndone in %s\n", end.Sub(start).String())
 				if diags.HasErrors() {
@@ -120,7 +107,7 @@ func do(ctx context.Context) (hcl.DiagnosticWriter, error) {
 		},
 	}
 
-	err := app.Run(os.Args)
+	err = app.Run(os.Args)
 	if err != nil {
 		return log, err
 	}

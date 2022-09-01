@@ -15,12 +15,56 @@ import (
 	"github.com/hashicorp/hcl/v2/hclparse"
 )
 
-func ReadRecipes(cwd string, parser *hclparse.Parser) ([]config.RawAddress, hcl.Diagnostics) {
-	files, err := ioutil.ReadDir(cwd)
+func GetPublicTasks(state *config.State, parser *hclparse.Parser) ([]lang.CliCommand, error) {
+	// read bake files in the cwd
+	addrs, diags := readRecipes(state, parser)
+	if diags.HasErrors() {
+		return nil, diags
+	}
+
+	return lang.FilterPublicTasks(addrs), nil
+}
+
+func Do(taskName string, state *config.State, parser *hclparse.Parser) hcl.Diagnostics {
+	// read bake files in the cwd
+	addrs, diags := readRecipes(state, parser)
+	if diags.HasErrors() {
+		return diags
+	}
+
+	task, diags := getTask(taskName, addrs)
+	if diags.HasErrors() {
+		return diags
+	}
+
+	coordinator := module.NewCoordinator()
+	actions, diags := coordinator.Do(state, task, addrs)
+	if state.Flags.Dry || state.Flags.Prune {
+		return diags
+	}
+
+	for _, action := range actions {
+		state.Lock.Update(action)
+	}
+
+	err := state.Lock.Store(state.CWD)
+	if err != nil {
+		diags.Append(&hcl.Diagnostic{
+			Severity: hcl.DiagError,
+			Summary:  "error storing state",
+			Detail:   err.Error(),
+		})
+	}
+
+	return diags
+}
+
+func readRecipes(state *config.State, parser *hclparse.Parser) ([]config.RawAddress, hcl.Diagnostics) {
+	files, err := ioutil.ReadDir(state.CWD)
 	if err != nil {
 		return nil, hcl.Diagnostics{{
 			Severity: hcl.DiagError,
-			Summary:  "couldn't read files in " + cwd,
+			Summary:  "couldn't read files in " + state.CWD,
 			Detail:   err.Error(),
 		}}
 	}
@@ -52,34 +96,6 @@ func ReadRecipes(cwd string, parser *hclparse.Parser) ([]config.RawAddress, hcl.
 	}
 
 	return addresses, nil
-}
-
-func Do(taskName string, state *config.State, addrs []config.RawAddress) hcl.Diagnostics {
-	task, diags := getTask(taskName, addrs)
-	if diags.HasErrors() {
-		return diags
-	}
-
-	coordinator := module.NewCoordinator()
-	actions, diags := coordinator.Do(state, task, addrs)
-	if state.Flags.Dry || state.Flags.Prune {
-		return diags
-	}
-
-	for _, action := range actions {
-		state.Lock.Update(action)
-	}
-
-	err := state.Lock.Store(state.CWD)
-	if err != nil {
-		diags.Append(&hcl.Diagnostic{
-			Severity: hcl.DiagError,
-			Summary:  "error storing state",
-			Detail:   err.Error(),
-		})
-	}
-
-	return diags
 }
 
 func getTask(name string, addresses []config.RawAddress) (config.RawAddress, hcl.Diagnostics) {
