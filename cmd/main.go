@@ -2,6 +2,7 @@ package main
 
 import (
 	"bake/internal"
+	"bake/internal/info"
 	"bake/internal/lang"
 	"bake/internal/lang/config"
 	"context"
@@ -51,11 +52,8 @@ func do(ctx context.Context) (hcl.DiagnosticWriter, error) {
 		Name:     "bake",
 		Usage:    `Build task orchestration`,
 		Compiled: time.Now(),
+		Version:  info.Version,
 		Commands: []*cli.Command{{
-			Name:   "help",
-			Usage:  "prints cli usage docs and exits",
-			Action: cli.ShowAppHelp,
-		}, {
 			Name:  "list",
 			Usage: "lists all public tasks; those that have a description",
 			Action: func(c *cli.Context) error {
@@ -76,35 +74,6 @@ func do(ctx context.Context) (hcl.DiagnosticWriter, error) {
 					fmt.Printf("%s\t%s", task.Name, task.Description)
 				}
 				return nil
-				/* for _, task := range tasks {
-					task := task
-					cmd := cli.Command{
-						Name:  task.Name,
-						Usage: task.Description,
-						Flags: []cli.Flag{
-							PruneFlag,
-							DryFlag,
-							ForceFlag,
-						},
-						Action: func(c *cli.Context) error {
-							state.Flags, err = config.NewStateFlags(c.Bool(Dry), c.Bool(Prune), c.Bool(Force))
-							if err != nil {
-								return err
-							}
-
-							start := time.Now()
-							diags := internal.Do(c.Command.Name, state, addrs)
-							end := time.Now()
-							fmt.Printf("\ndone in %s\n", end.Sub(start).String())
-							if diags.HasErrors() {
-								return diags
-							}
-
-							return nil
-						},
-					}
-					app.Commands = append(app.Commands, cmd)
-				} */
 			},
 		}, {
 			Name:  "run",
@@ -112,11 +81,12 @@ func do(ctx context.Context) (hcl.DiagnosticWriter, error) {
 			Flags: []cli.Flag{
 				&DryFlag,
 				&ForceFlag,
+				&PruneFlag,
 			},
 			Action: func(c *cli.Context) error {
 				task := c.Args().Get(0)
 				if task == "" {
-					return fmt.Errorf("missing task name")
+					return cli.ShowCommandHelp(c, c.Command.Name)
 				}
 
 				// keep track of flags and other config related vars
