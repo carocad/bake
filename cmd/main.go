@@ -14,7 +14,7 @@ import (
 
 	"github.com/hashicorp/hcl/v2"
 	"github.com/hashicorp/hcl/v2/hclparse"
-	"github.com/urfave/cli"
+	"github.com/urfave/cli/v2"
 )
 
 func main() {
@@ -47,47 +47,97 @@ func do(ctx context.Context) (hcl.DiagnosticWriter, error) {
 	parser := hclparse.NewParser()
 	// logger for diagnostics
 	log := hcl.NewDiagnosticTextWriter(os.Stdout, parser.Files(), 78, true)
-	// keep track of flags and other config related vars
-	state, err := config.NewState(ctx)
-	if err != nil {
-		return log, err
-	}
-
-	// read bake files in the cwd
-	addrs, diags := internal.ReadRecipes(state.CWD, parser)
-	if diags.HasErrors() {
-		return log, diags
-	}
-
-	tasks := lang.GetPublicTasks(addrs)
 	app := &cli.App{
-		Name: "bake",
-		Usage: `Build task orchestration. 
-		
-		NOTE: The "commands" below only contain tasks which have a description.`,
-		Flags: []cli.Flag{
-			PruneFlag, // TODO: implement this
-		},
-	}
+		Name:     "bake",
+		Usage:    `Build task orchestration`,
+		Compiled: time.Now(),
+		Commands: []*cli.Command{{
+			Name:   "help",
+			Usage:  "prints cli usage docs and exits",
+			Action: cli.ShowAppHelp,
+		}, {
+			Name:  "list",
+			Usage: "lists all public tasks; those that have a description",
+			Action: func(c *cli.Context) error {
+				// keep track of flags and other config related vars
+				state, err := config.NewState(ctx)
+				if err != nil {
+					return err
+				}
 
-	for _, task := range tasks {
-		task := task
-		cmd := cli.Command{
-			Name:  task.Name,
-			Usage: task.Description,
+				// read bake files in the cwd
+				addrs, diags := internal.ReadRecipes(state.CWD, parser)
+				if diags.HasErrors() {
+					return diags
+				}
+
+				tasks := lang.GetPublicTasks(addrs)
+				for _, task := range tasks {
+					fmt.Printf("%s\t%s", task.Name, task.Description)
+				}
+				return nil
+				/* for _, task := range tasks {
+					task := task
+					cmd := cli.Command{
+						Name:  task.Name,
+						Usage: task.Description,
+						Flags: []cli.Flag{
+							PruneFlag,
+							DryFlag,
+							ForceFlag,
+						},
+						Action: func(c *cli.Context) error {
+							state.Flags, err = config.NewStateFlags(c.Bool(Dry), c.Bool(Prune), c.Bool(Force))
+							if err != nil {
+								return err
+							}
+
+							start := time.Now()
+							diags := internal.Do(c.Command.Name, state, addrs)
+							end := time.Now()
+							fmt.Printf("\ndone in %s\n", end.Sub(start).String())
+							if diags.HasErrors() {
+								return diags
+							}
+
+							return nil
+						},
+					}
+					app.Commands = append(app.Commands, cmd)
+				} */
+			},
+		}, {
+			Name:  "run",
+			Usage: "runs the provided task from bake files",
 			Flags: []cli.Flag{
-				PruneFlag,
-				DryFlag,
-				ForceFlag,
+				&DryFlag,
+				&ForceFlag,
 			},
 			Action: func(c *cli.Context) error {
+				task := c.Args().Get(0)
+				if task == "" {
+					return fmt.Errorf("missing task name")
+				}
+
+				// keep track of flags and other config related vars
+				state, err := config.NewState(ctx)
+				if err != nil {
+					return err
+				}
+
+				// read bake files in the cwd
+				addrs, diags := internal.ReadRecipes(state.CWD, parser)
+				if diags.HasErrors() {
+					return diags
+				}
+
 				state.Flags, err = config.NewStateFlags(c.Bool(Dry), c.Bool(Prune), c.Bool(Force))
 				if err != nil {
 					return err
 				}
 
 				start := time.Now()
-				diags := internal.Do(c.Command.Name, state, addrs)
+				diags = internal.Do(task, state, addrs)
 				end := time.Now()
 				fmt.Printf("\ndone in %s\n", end.Sub(start).String())
 				if diags.HasErrors() {
@@ -96,11 +146,11 @@ func do(ctx context.Context) (hcl.DiagnosticWriter, error) {
 
 				return nil
 			},
-		}
-		app.Commands = append(app.Commands, cmd)
+		},
+		},
 	}
 
-	err = app.Run(os.Args)
+	err := app.Run(os.Args)
 	if err != nil {
 		return log, err
 	}
