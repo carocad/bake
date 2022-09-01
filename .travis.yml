@@ -14,8 +14,13 @@ jobs:
   include:
     - stage: tests
       script:
+        - ./scripts/bootstrap.sh list
         - ./scripts/bootstrap.sh run --dry main
         - ./scripts/bootstrap.sh run main
+        - ./scripts/bootstrap.sh run --prune --dry main
+        - ./scripts/bootstrap.sh run --prune main
+        - ./scripts/bootstrap.sh run --force main
+        - ./scripts/bootstrap.sh run main # try again just to confirm we don't build anything
     - stage: Release
       if: tag IS present
       script: # TODO
