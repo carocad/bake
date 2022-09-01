@@ -70,7 +70,7 @@ func do(ctx context.Context) (hcl.DiagnosticWriter, error) {
 
 				// TODO: pretty print list
 				for _, task := range tasks {
-					fmt.Printf("%s\t%s", task.Name, task.Description)
+					fmt.Printf("%s\t%s\n", task.Name, task.Description)
 				}
 				return nil
 			},
