@@ -9,7 +9,12 @@ import (
 	"testing"
 )
 
-func Test_do(t *testing.T) {
+/**
+ * TestBootstrap checks that running bake on the current directory
+ * wont result in an error; this is specially useful to test whether
+ * or not bake is able to build itself
+ */
+func TestBootstrap(t *testing.T) {
 	oldArgs := os.Args
 	newArgs := append([]string{oldArgs[0]}, oldArgs[3:]...)
 	defer func() { os.Args = oldArgs }()
